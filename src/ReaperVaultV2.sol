@@ -660,7 +660,7 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
      *      Subclasses should override this to specify their unique roles arranged in the correct
      *      order, for example, [SUPER-ADMIN, ADMIN, GUARDIAN, STRATEGIST].
      */
-    function _cascadingAccessRoles() internal view override returns (bytes32[] memory) {
+    function _cascadingAccessRoles() internal pure override returns (bytes32[] memory) {
         bytes32[] memory cascadingAccessRoles = new bytes32[](4);
         cascadingAccessRoles[0] = DEFAULT_ADMIN_ROLE;
         cascadingAccessRoles[1] = ADMIN;
