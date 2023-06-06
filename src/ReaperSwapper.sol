@@ -2,12 +2,14 @@
 
 pragma solidity ^0.8.0;
 
+import "./interfaces/AggregatorV3Interface.sol";
 import "./mixins/UniV2Mixin.sol";
 import "./mixins/BalMixin.sol";
 import "./mixins/VeloSolidMixin.sol";
 import "./mixins/UniV3Mixin.sol";
 import "./mixins/ReaperAccessControl.sol";
 import "./libraries/ReaperMathUtils.sol";
+import "oz/token/ERC20/extensions/IERC20Metadata.sol";
 import "oz/token/ERC20/utils/SafeERC20.sol";
 import "oz/access/AccessControlEnumerable.sol";
 
@@ -20,7 +22,25 @@ contract ReaperSwapper is
     ReaperAccessControl
 {
     using ReaperMathUtils for uint256;
-    using SafeERC20 for IERC20;
+    using SafeERC20 for IERC20Metadata;
+
+    struct ChainlinkResponse {
+        uint80 roundId;
+        int256 answer;
+        uint256 timestamp;
+        bool success;
+        uint8 decimals;
+    }
+
+    enum MinAmountOutKind {
+        Absolute,
+        CLBased
+    }
+
+    struct MinAmountOutData {
+        MinAmountOutKind kind;
+        uint256 value; // for type "CLBased", value must be in BPS
+    }
 
     /**
      * Reaper Roles in increasing order of privilege.
@@ -32,6 +52,18 @@ contract ReaperSwapper is
      */
     bytes32 public constant STRATEGIST = keccak256("STRATEGIST");
     bytes32 public constant GUARDIAN = keccak256("GUARDIAN");
+
+    // Use to convert a price answer to an 18-digit precision uint
+    uint256 public constant TARGET_DIGITS = 18;
+    // Use to calculate slippage when using CL aggregator for minAmountOut
+    uint256 public constant PERCENT_DIVISOR = 10_000;
+
+    // token => CL aggregator mapping
+    mapping(address => AggregatorV3Interface) public priceAggregator;
+
+    // Maximum time period allowed since Chainlink's latest round data timestamp,
+    // beyond which Chainlink is considered frozen.
+    uint256 public aggregatorTimeout = 14400; // 4 hours: 60 * 60 * 4
 
     constructor(address[] memory _strategists, address _guardian) {
         uint256 numStrategists = _strategists.length;
@@ -78,39 +110,87 @@ contract ReaperSwapper is
         _updateUniV3Quoter(_router, _quoter);
     }
 
-    function swapUniV2(address _from, address _to, uint256 _amount, uint256 _minAmountOut, address _router)
-        external
-        pullFromBefore(_from, _amount)
-        pushFromAndToAfter(_from, _to)
-        returns (uint256)
-    {
-        return _swapUniV2(_from, _to, _amount, _minAmountOut, _router);
+    function updateTokenAggregator(address _token, address _aggregator) external {
+        _atLeastRole(GUARDIAN);
+        priceAggregator[_token] = AggregatorV3Interface(_aggregator);
+        _getChainlinkPriceTargetDigits(_token);
     }
 
-    function swapBal(address _from, address _to, uint256 _amount, uint256 _minAmountOut, address _vault)
-        external
-        pullFromBefore(_from, _amount)
-        pushFromAndToAfter(_from, _to)
-        returns (uint256)
-    {
-        return _swapBal(_from, _to, _amount, _minAmountOut, _vault);
+    function updateAggregatorTimeout(uint256 _timeout) external {
+        _atLeastRole(GUARDIAN);
+        aggregatorTimeout = _timeout;
     }
 
-    function swapVelo(address _from, address _to, uint256 _amount, uint256 _minAmountOut, address _router)
-        external
-        pullFromBefore(_from, _amount)
-        pushFromAndToAfter(_from, _to)
-    {
-        _swapVelo(_from, _to, _amount, _minAmountOut, _router);
+    function swapUniV2(
+        address _from,
+        address _to,
+        uint256 _amount,
+        MinAmountOutData memory _minAmountOutData,
+        address _router
+    ) external pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
+        uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
+        return _swapUniV2(_from, _to, _amount, minAmountOut, _router);
     }
 
-    function swapUniV3(address _from, address _to, uint256 _amount, uint256 _minAmountOut, address _router)
-        external
-        pullFromBefore(_from, _amount)
-        pushFromAndToAfter(_from, _to)
-        returns (uint256)
-    {
-        return _swapUniV3(_from, _to, _amount, _minAmountOut, _router);
+    function swapBal(
+        address _from,
+        address _to,
+        uint256 _amount,
+        MinAmountOutData memory _minAmountOutData,
+        address _vault
+    ) external pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
+        uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
+        return _swapBal(_from, _to, _amount, minAmountOut, _vault);
+    }
+
+    function swapVelo(
+        address _from,
+        address _to,
+        uint256 _amount,
+        MinAmountOutData memory _minAmountOutData,
+        address _router
+    ) external pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) {
+        uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
+        _swapVelo(_from, _to, _amount, minAmountOut, _router);
+    }
+
+    function swapUniV3(
+        address _from,
+        address _to,
+        uint256 _amount,
+        MinAmountOutData memory _minAmountOutData,
+        address _router
+    ) external pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
+        uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
+        return _swapUniV3(_from, _to, _amount, minAmountOut, _router);
+    }
+
+    function _calculateMinAmountOut(
+        address _from,
+        address _to,
+        uint256 _amountIn,
+        MinAmountOutData memory _minAmountOutData
+    ) internal view returns (uint256 minAmountOut) {
+        if (_minAmountOutData.kind == MinAmountOutKind.Absolute) {
+            return _minAmountOutData.value;
+        }
+
+        // Validate input
+        AggregatorV3Interface fromAggregator = priceAggregator[_from];
+        require(address(fromAggregator) != address(0), "CL aggregator not registered");
+        AggregatorV3Interface toAggregator = priceAggregator[_to];
+        require(address(toAggregator) != address(0), "CL aggregator not registered");
+        require(_minAmountOutData.value <= PERCENT_DIVISOR, "Invalid BPS value");
+
+        // Get asset prices in target digit precision (18 decimals)
+        uint256 fromPriceTargetDigits = _getChainlinkPriceTargetDigits(_from);
+        uint256 toPriceTargetDigits = _getChainlinkPriceTargetDigits(_from);
+
+        // Get asset USD amounts in target digit precision (18 decimals)
+        uint256 fromAmountUsdTargetDigits = (_amountIn * fromPriceTargetDigits) / 10 ** IERC20Metadata(_from).decimals();
+        uint256 toAmountUsdTargetDigits = fromAmountUsdTargetDigits * _minAmountOutData.value / PERCENT_DIVISOR;
+
+        minAmountOut = (toAmountUsdTargetDigits * 10 ** IERC20Metadata(_to).decimals()) / toPriceTargetDigits;
     }
 
     /**
@@ -133,20 +213,134 @@ contract ReaperSwapper is
         return hasRole(_role, _account);
     }
 
+    function _getChainlinkPriceTargetDigits(address _token) internal view returns (uint256 price) {
+        ChainlinkResponse memory chainlinkResponse = _getCurrentChainlinkResponse(_token);
+        ChainlinkResponse memory prevChainlinkResponse =
+            _getPrevChainlinkResponse(_token, chainlinkResponse.roundId, chainlinkResponse.decimals);
+        require(
+            !_chainlinkIsBroken(chainlinkResponse, prevChainlinkResponse) && !_chainlinkIsFrozen(chainlinkResponse),
+            "PriceFeed: Chainlink must be working and current"
+        );
+        price = _scaleChainlinkPriceByDigits(uint256(chainlinkResponse.answer), chainlinkResponse.decimals);
+    }
+
+    function _getCurrentChainlinkResponse(address _token)
+        internal
+        view
+        returns (ChainlinkResponse memory chainlinkResponse)
+    {
+        // First, try to get current decimal precision:
+        try priceAggregator[_token].decimals() returns (uint8 decimals) {
+            // If call to Chainlink succeeds, record the current decimal precision
+            chainlinkResponse.decimals = decimals;
+        } catch {
+            // If call to Chainlink aggregator reverts, return a zero response with success = false
+            return chainlinkResponse;
+        }
+
+        // Secondly, try to get latest price data:
+        try priceAggregator[_token].latestRoundData() returns (
+            uint80 roundId, int256 answer, uint256, /* startedAt */ uint256 timestamp, uint80 /* answeredInRound */
+        ) {
+            // If call to Chainlink succeeds, return the response and success = true
+            chainlinkResponse.roundId = roundId;
+            chainlinkResponse.answer = answer;
+            chainlinkResponse.timestamp = timestamp;
+            chainlinkResponse.success = true;
+            return chainlinkResponse;
+        } catch {
+            // If call to Chainlink aggregator reverts, return a zero response with success = false
+            return chainlinkResponse;
+        }
+    }
+
+    function _getPrevChainlinkResponse(address _token, uint80 _currentRoundId, uint8 _currentDecimals)
+        internal
+        view
+        returns (ChainlinkResponse memory prevChainlinkResponse)
+    {
+        /*
+        * NOTE: Chainlink only offers a current decimals() value - there is no way to obtain the decimal precision used in a 
+        * previous round.  We assume the decimals used in the previous round are the same as the current round.
+        */
+
+        // Try to get the price data from the previous round:
+        try priceAggregator[_token].getRoundData(_currentRoundId - 1) returns (
+            uint80 roundId, int256 answer, uint256, /* startedAt */ uint256 timestamp, uint80 /* answeredInRound */
+        ) {
+            // If call to Chainlink succeeds, return the response and success = true
+            prevChainlinkResponse.roundId = roundId;
+            prevChainlinkResponse.answer = answer;
+            prevChainlinkResponse.timestamp = timestamp;
+            prevChainlinkResponse.decimals = _currentDecimals;
+            prevChainlinkResponse.success = true;
+            return prevChainlinkResponse;
+        } catch {
+            // If call to Chainlink aggregator reverts, return a zero response with success = false
+            return prevChainlinkResponse;
+        }
+    }
+
+    /* Chainlink is considered broken if its current or previous round data is in any way bad. We check the previous round
+    * for two reasons:
+    *
+    * 1) It is necessary data for the price deviation check in case 1,
+    * and
+    * 2) Chainlink is the PriceFeed's preferred primary oracle - having two consecutive valid round responses adds
+    * peace of mind when using or returning to Chainlink.
+    */
+    function _chainlinkIsBroken(ChainlinkResponse memory _currentResponse, ChainlinkResponse memory _prevResponse)
+        internal
+        view
+        returns (bool)
+    {
+        return _badChainlinkResponse(_currentResponse) || _badChainlinkResponse(_prevResponse);
+    }
+
+    function _badChainlinkResponse(ChainlinkResponse memory _response) internal view returns (bool) {
+        // Check for response call reverted
+        if (!_response.success) return true;
+        // Check for an invalid roundId that is 0
+        if (_response.roundId == 0) return true;
+        // Check for an invalid timeStamp that is 0, or in the future
+        if (_response.timestamp == 0 || _response.timestamp > block.timestamp) return true;
+        // Check for non-positive price
+        if (_response.answer <= 0) return true;
+
+        return false;
+    }
+
+    function _chainlinkIsFrozen(ChainlinkResponse memory _response) internal view returns (bool) {
+        return block.timestamp - _response.timestamp > aggregatorTimeout;
+    }
+
+    function _scaleChainlinkPriceByDigits(uint256 _price, uint256 _answerDigits) internal pure returns (uint256) {
+        // Convert the price returned by the Chainlink oracle to an 18-digit decimal
+        uint256 price;
+        if (_answerDigits >= TARGET_DIGITS) {
+            // Scale the returned price value down to our target precision
+            price = _price / (10 ** (_answerDigits - TARGET_DIGITS));
+        } else if (_answerDigits < TARGET_DIGITS) {
+            // Scale the returned price value up to our target precision
+            price = _price * (10 ** (TARGET_DIGITS - _answerDigits));
+        }
+        return price;
+    }
+
     modifier pullFromBefore(address _from, uint256 _amount) {
-        IERC20(_from).safeTransferFrom(msg.sender, address(this), _amount);
+        IERC20Metadata(_from).safeTransferFrom(msg.sender, address(this), _amount);
         _;
     }
 
     modifier pushFromAndToAfter(address _from, address _to) {
         _;
-        uint256 fromBal = IERC20(_from).balanceOf(address(this));
+        uint256 fromBal = IERC20Metadata(_from).balanceOf(address(this));
         if (fromBal != 0) {
-            IERC20(_from).safeTransfer(msg.sender, fromBal);
+            IERC20Metadata(_from).safeTransfer(msg.sender, fromBal);
         }
-        uint256 toBal = IERC20(_to).balanceOf(address(this));
+        uint256 toBal = IERC20Metadata(_to).balanceOf(address(this));
         if (toBal != 0) {
-            IERC20(_to).safeTransfer(msg.sender, toBal);
+            IERC20Metadata(_to).safeTransfer(msg.sender, toBal);
         }
     }
 }
