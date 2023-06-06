@@ -110,6 +110,20 @@ abstract contract ReaperBaseStrategyv4 is
     /**
      * @dev harvest() function that takes care of logging. Subcontracts should
      *      override _harvestCore() and implement their specific logic in it.
+     *
+     * This method returns any realized profits and/or realized losses
+     * incurred, and should return the total amounts of profits/losses/debt
+     * payments (in `want` tokens) for the Vault's accounting.
+     *
+     * `debt` will be 0 if the Strategy is not past the configured
+     * allocated capital, otherwise its value will be how far past the allocation
+     * the Strategy is. The Strategy's allocation is configured in the Vault.
+     *
+     * NOTE: `repayment` should be less than or equal to `debt`.
+     *       It is okay for it to be less than `debt`, as that
+     *       should only used as a guide for how much is left to pay back.
+     *       Payments should be made to minimize loss from slippage, debt,
+     *       withdrawal fees, etc.
      */
     function harvest() public override returns (int256 roi) {
         _atLeastRole(KEEPER);
@@ -133,7 +147,23 @@ abstract contract ReaperBaseStrategyv4 is
                 repayment -= uint256(-roi);
             }
         } else {
-            (roi, repayment) = _harvestCore(debt);
+            _harvestCore();
+
+            uint256 allocated = IVault(vault).strategies(address(this)).allocated;
+            uint256 totalAssets = balanceOf();
+            uint256 toFree = MathUpgradeable.min(debt, totalAssets);
+
+            if (totalAssets > allocated) {
+                uint256 profit = totalAssets - allocated;
+                toFree += profit;
+                roi = int256(profit);
+            } else if (totalAssets < allocated) {
+                roi = -int256(allocated - totalAssets);
+            }
+
+            (uint256 amountFreed, uint256 loss) = _liquidatePosition(toFree);
+            repayment = MathUpgradeable.min(debt, amountFreed);
+            roi -= int256(loss);
         }
 
         debt = IVault(vault).report(roi, repayment);
@@ -144,9 +174,24 @@ abstract contract ReaperBaseStrategyv4 is
 
     /**
      * @dev Function to calculate the total {want} held by the strat.
+     *      It only takes into account funds in hand.
+     */
+    function balanceOfWant() public view virtual returns (uint256) {
+        return IERC20Upgradeable(want).balanceOf(address(this));
+    }
+
+    /**
+     * @dev Function to calculate the total {want} in external contracts only.
+     */
+    function balanceOfPool() public view virtual returns (uint256);
+
+    /**
+     * @dev Function to calculate the total {want} held by the strat.
      *      It takes into account both the funds in hand, plus the funds in external contracts.
      */
-    function balanceOf() public view virtual override returns (uint256);
+    function balanceOf() public view virtual override returns (uint256) {
+        return balanceOfWant() + balanceOfPool();
+    }
 
     /**
      * @notice
@@ -204,7 +249,7 @@ abstract contract ReaperBaseStrategyv4 is
      *      Subclasses should override this to specify their unique roles arranged in the correct
      *      order, for example, [SUPER-ADMIN, ADMIN, GUARDIAN, STRATEGIST].
      */
-    function _cascadingAccessRoles() internal view override returns (bytes32[] memory) {
+    function _cascadingAccessRoles() internal pure override returns (bytes32[] memory) {
         bytes32[] memory cascadingAccessRoles = new bytes32[](5);
         cascadingAccessRoles[0] = DEFAULT_ADMIN_ROLE;
         cascadingAccessRoles[1] = ADMIN;
@@ -229,7 +274,17 @@ abstract contract ReaperBaseStrategyv4 is
      * was made is available for reinvestment. Also note that this number
      * could be 0, and you should handle that scenario accordingly.
      */
-    function _adjustPosition(uint256 _debt) internal virtual;
+    function _adjustPosition(uint256 _debt) internal virtual {
+        if (emergencyExit) {
+            return;
+        }
+
+        uint256 wantBalance = balanceOfWant();
+        if (wantBalance > _debt) {
+            uint256 toReinvest = wantBalance - _debt;
+            _deposit(toReinvest);
+        }
+    }
 
     /**
      * Liquidate up to `_amountNeeded` of `want` of this strategy's positions,
@@ -244,7 +299,20 @@ abstract contract ReaperBaseStrategyv4 is
     function _liquidatePosition(uint256 _amountNeeded)
         internal
         virtual
-        returns (uint256 liquidatedAmount, uint256 loss);
+        returns (uint256 liquidatedAmount, uint256 loss)
+    {
+        uint256 wantBal = balanceOfWant();
+        if (wantBal < _amountNeeded) {
+            _withdraw(_amountNeeded - wantBal);
+            liquidatedAmount = balanceOfWant();
+        } else {
+            liquidatedAmount = _amountNeeded;
+        }
+
+        if (_amountNeeded > liquidatedAmount) {
+            loss = _amountNeeded - liquidatedAmount;
+        }
+    }
 
     /**
      * Liquidate everything and returns the amount that got freed.
@@ -254,28 +322,23 @@ abstract contract ReaperBaseStrategyv4 is
     function _liquidateAllPositions() internal virtual returns (uint256 amountFreed);
 
     /**
+     * @dev Function that puts the funds to work.
+     * It gets called whenever the vault has allocated more free want to this strategy that can be
+     * deposited in external contracts to generate yield.
+     */
+    function _deposit(uint256 toReinvest) internal virtual;
+
+    /**
+     * @dev Withdraws funds from external contracts and brings them back to the strategy.
+     */
+    function _withdraw(uint256 _amount) internal virtual;
+
+    /**
      * Perform any Strategy unwinding or other calls necessary to capture the
      * "free return" this Strategy has generated since the last time its core
      * position(s) were adjusted. Examples include unwrapping extra rewards.
      * This call is only used during "normal operation" of a Strategy, and
      * should be optimized to minimize losses as much as possible.
-     *
-     * This method returns any realized profits and/or realized losses
-     * incurred, and should return the total amounts of profits/losses/debt
-     * payments (in `want` tokens) for the Vault's accounting.
-     *
-     * `_debt` will be 0 if the Strategy is not past the configured
-     * allocated capital, otherwise its value will be how far past the allocation
-     * the Strategy is. The Strategy's allocation is configured in the Vault.
-     *
-     * NOTE: `repayment` should be less than or equal to `_debt`.
-     *       It is okay for it to be less than `_debt`, as that
-     *       should only used as a guide for how much is left to pay back.
-     *       Payments should be made to minimize loss from slippage, debt,
-     *       withdrawal fees, etc.
-     * @dev subclasses should add their custom harvesting logic in this function
-     *      including charging any fees. The amount of fee that is remitted to the
-     *      caller must be returned.
      */
-    function _harvestCore(uint256 _debt) internal virtual returns (int256 roi, uint256 repayment);
+    function _harvestCore() internal virtual;
 }
