@@ -13,6 +13,16 @@ interface ISwapper {
         uint256 value; // for type "CLBased", value must be in BPS
     }
 
+    function uniV2SwapPaths(address _from, address _to, address _router, uint256 _index) external returns (address);
+
+    function balSwapPoolIDs(address _from, address _to, address _vault) external returns (bytes32);
+
+    function veloSwapPaths(address _from, address _to, address _router, uint256 _index) external returns (address);
+
+    function uniV3SwapPaths(address _from, address _to, address _router, uint256 _index) external returns (address);
+
+    function uniV3Quoters(address _router) external returns (address);
+
     function updateUniV2SwapPath(address _tokenIn, address _tokenOut, address _router, address[] calldata _path)
         external;
 

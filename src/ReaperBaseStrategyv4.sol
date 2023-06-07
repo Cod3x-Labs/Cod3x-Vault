@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "./interfaces/IStrategy.sol";
+import "./interfaces/ISwapper.sol";
 import "./interfaces/IVault.sol";
 import "./libraries/ReaperMathUtils.sol";
 import "./mixins/ReaperAccessControl.sol";
@@ -51,11 +52,30 @@ abstract contract ReaperBaseStrategyv4 is
     bytes32 public constant GUARDIAN = keccak256("GUARDIAN");
     bytes32 public constant ADMIN = keccak256("ADMIN");
 
+    enum ExchangeType {
+        UniV2,
+        Bal,
+        VeloSolid,
+        UniV3
+    }
+
+    struct SwapStep {
+        ExchangeType exType;
+        address start;
+        address end;
+        ISwapper.MinAmountOutData minAmountOutData;
+        address exAddress; // router (vault for Bal)
+    }
+
+    SwapStep[] public swapSteps;
+
     /**
      * @dev Reaper contracts:
      * {vault} - Address of the vault that controls the strategy's funds.
+     * {swapper} - Address of the master swapper external contract.
      */
     address public vault;
+    ISwapper public swapper;
 
     uint256[50] private __gap;
 
@@ -64,6 +84,7 @@ abstract contract ReaperBaseStrategyv4 is
 
     function __ReaperBaseStrategy_init(
         address _vault,
+        address _swapper,
         address _want,
         address[] memory _strategists,
         address[] memory _multisigRoles,
@@ -73,6 +94,7 @@ abstract contract ReaperBaseStrategyv4 is
         __AccessControlEnumerable_init();
 
         vault = _vault;
+        swapper = ISwapper(_swapper);
         want = _want;
         IERC20Upgradeable(want).safeApprove(vault, type(uint256).max);
 
@@ -172,6 +194,32 @@ abstract contract ReaperBaseStrategyv4 is
         lastHarvestTimestamp = block.timestamp;
     }
 
+    function _harvestCore() internal virtual {
+        _beforeHarvestSwapSteps();
+        uint256 numSteps = swapSteps.length;
+        for (uint256 i = 0; i < numSteps; i = i.uncheckedInc()) {
+            SwapStep storage step = swapSteps[i];
+            IERC20Upgradeable startToken = IERC20Upgradeable(step.start);
+            uint256 amount = startToken.balanceOf(address(this));
+            if (amount == 0) {
+                continue;
+            }
+
+            startToken.safeApprove(address(swapper), 0);
+            startToken.safeIncreaseAllowance(address(swapper), amount);
+            if (step.exType == ExchangeType.UniV2) {
+                swapper.swapUniV2(step.start, step.end, amount, step.minAmountOutData, step.exAddress);
+            } else if (step.exType == ExchangeType.Bal) {
+                swapper.swapBal(step.start, step.end, amount, step.minAmountOutData, step.exAddress);
+            } else if (step.exType == ExchangeType.VeloSolid) {
+                swapper.swapVelo(step.start, step.end, amount, step.minAmountOutData, step.exAddress);
+            } else if (step.exType == ExchangeType.UniV3) {
+                swapper.swapUniV3(step.start, step.end, amount, step.minAmountOutData, step.exAddress);
+            }
+        }
+        _afterHarvestSwapSteps();
+    }
+
     /**
      * @dev Function to calculate the total {want} held by the strat.
      *      It only takes into account funds in hand.
@@ -207,6 +255,68 @@ abstract contract ReaperBaseStrategyv4 is
         _atLeastRole(GUARDIAN);
         emergencyExit = true;
         IVault(vault).revokeStrategy(address(this));
+    }
+
+    /**
+     * Only {ADMIN} or higher roles may set the array
+     * of swap steps executed as part of harvest.
+     */
+    function setHarvestSwapSteps(SwapStep[] calldata _newSteps) external {
+        _atLeastRole(ADMIN);
+
+        uint256 numSteps = swapSteps.length;
+        for (uint256 i = 0; i < numSteps; i = i.uncheckedInc()) {
+            delete swapSteps[i].minAmountOutData;
+        }
+        delete swapSteps;
+
+        for (uint256 i = 0; i < _newSteps.length; i = i.uncheckedInc()) {
+            SwapStep memory step = _newSteps[i];
+            _verifySwapStep(step);
+            swapSteps.push(step);
+        }
+    }
+
+    function setHarvestSwapStepAtIndex(SwapStep calldata _newStep, uint256 index) external {
+        _atLeastRole(ADMIN);
+        delete swapSteps[index].minAmountOutData;
+        delete swapSteps[index];
+        _verifySwapStep(_newStep);
+        swapSteps[index] = _newStep;
+    }
+
+    function _verifySwapStep(SwapStep memory _step) internal {
+        // Paths must be at least two elements long so we query the elements at index 1.
+        // This is because in solidity's auto-generated view functions for mappings,
+        // if the innermost item of the mapping is an array, the view function instead adds
+        // a uint parameter at the end of the view function.
+        if (_step.exType == ExchangeType.UniV2) {
+            address pathElement = swapper.uniV2SwapPaths(_step.start, _step.end, _step.exAddress, 1);
+            require(pathElement != address(0), "Path for step not registered in swapper");
+        } else if (_step.exType == ExchangeType.Bal) {
+            bytes32 poolID = swapper.balSwapPoolIDs(_step.start, _step.end, _step.exAddress);
+            require(poolID != bytes32(0), "Pool ID for step not registered in swapper");
+        } else if (_step.exType == ExchangeType.VeloSolid) {
+            address pathElement = swapper.veloSwapPaths(_step.start, _step.end, _step.exAddress, 1);
+            require(pathElement != address(0), "Path for step not registered in swapper");
+        } else if (_step.exType == ExchangeType.UniV3) {
+            address pathElement = swapper.uniV3SwapPaths(_step.start, _step.end, _step.exAddress, 1);
+            require(pathElement != address(0), "Path for step not registered in swapper");
+            address quoter = swapper.uniV3Quoters(_step.exAddress);
+            require(quoter != address(0), "Quoter for provided router not registered in swapper");
+        }
+
+        if (_step.minAmountOutData.kind == ISwapper.MinAmountOutKind.CLBased) {
+            require(_step.minAmountOutData.value <= PERCENT_DIVISOR, "Invalid BPS value for minAmountOut");
+        }
+    }
+
+    /**
+     * Only {ADMIN} or higher roles may update the swapper.
+     */
+    function setSwapper(address _newSwapper) external {
+        _atLeastRole(ADMIN);
+        swapper = ISwapper(_newSwapper);
     }
 
     /**
@@ -334,11 +444,21 @@ abstract contract ReaperBaseStrategyv4 is
     function _withdraw(uint256 _amount) internal virtual;
 
     /**
-     * Perform any Strategy unwinding or other calls necessary to capture the
-     * "free return" this Strategy has generated since the last time its core
-     * position(s) were adjusted. Examples include unwrapping extra rewards.
-     * This call is only used during "normal operation" of a Strategy, and
-     * should be optimized to minimize losses as much as possible.
+     * @dev Override this hook for taking actions before the harvest swap steps are executed.
+     *      For example, claiming rewards.
+     *
+     *      If you're not using the harvest steps at all, but you still need to take certain actions
+     *      as part of the harvest, you have two options:
+     *      1. Override _harvestCore() and execute your actions inside of it
+     *      2. Override one of _beforeHarvestSwapSteps() or _afterHarvestSwapSteps() and ensure
+     *         no steps are registered in this strategy.
+     *
      */
-    function _harvestCore() internal virtual;
+    function _beforeHarvestSwapSteps() internal virtual {}
+
+    /**
+     * @dev Override this hook for taking actions after the harvest swap steps are executed.
+     *      For example, adding liquidity, or anything else that cannot be accomplished with a dex swap.
+     */
+    function _afterHarvestSwapSteps() internal virtual {}
 }
