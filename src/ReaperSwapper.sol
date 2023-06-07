@@ -42,6 +42,13 @@ contract ReaperSwapper is
         uint256 value; // for type "CLBased", value must be in BPS
     }
 
+    // timeout is maximum time period allowed since Chainlink's latest round data timestamp,
+    // beyond which Chainlink is considered frozen.
+    struct CLAggregatorData {
+        AggregatorV3Interface aggregator;
+        uint256 timeout; // this allows us to use different timeouts per asset/aggregator
+    }
+
     /**
      * Reaper Roles in increasing order of privilege.
      * {STRATEGIST} - Role conferred to authors of strategies, allows for setting swap paths.
@@ -58,12 +65,8 @@ contract ReaperSwapper is
     // Use to calculate slippage when using CL aggregator for minAmountOut
     uint256 public constant PERCENT_DIVISOR = 10_000;
 
-    // token => CL aggregator mapping
-    mapping(address => AggregatorV3Interface) public priceAggregator;
-
-    // Maximum time period allowed since Chainlink's latest round data timestamp,
-    // beyond which Chainlink is considered frozen.
-    uint256 public aggregatorTimeout = 14400; // 4 hours: 60 * 60 * 4
+    // token => CL aggregator data mapping
+    mapping(address => CLAggregatorData) public aggregatorData;
 
     constructor(address[] memory _strategists, address _guardian) {
         uint256 numStrategists = _strategists.length;
@@ -110,15 +113,10 @@ contract ReaperSwapper is
         _updateUniV3Quoter(_router, _quoter);
     }
 
-    function updateTokenAggregator(address _token, address _aggregator) external {
+    function updateTokenAggregator(address _token, address _aggregator, uint256 _timeout) external {
         _atLeastRole(GUARDIAN);
-        priceAggregator[_token] = AggregatorV3Interface(_aggregator);
+        aggregatorData[_token] = CLAggregatorData(AggregatorV3Interface(_aggregator), _timeout);
         _getChainlinkPriceTargetDigits(_token);
-    }
-
-    function updateAggregatorTimeout(uint256 _timeout) external {
-        _atLeastRole(GUARDIAN);
-        aggregatorTimeout = _timeout;
     }
 
     function swapUniV2(
@@ -176,10 +174,10 @@ contract ReaperSwapper is
         }
 
         // Validate input
-        AggregatorV3Interface fromAggregator = priceAggregator[_from];
-        require(address(fromAggregator) != address(0), "CL aggregator not registered");
-        AggregatorV3Interface toAggregator = priceAggregator[_to];
-        require(address(toAggregator) != address(0), "CL aggregator not registered");
+        CLAggregatorData storage fromAggregatorData = aggregatorData[_from];
+        require(address(fromAggregatorData.aggregator) != address(0), "CL aggregator not registered");
+        CLAggregatorData storage toAggregatorData = aggregatorData[_to];
+        require(address(toAggregatorData.aggregator) != address(0), "CL aggregator not registered");
         require(_minAmountOutData.value <= PERCENT_DIVISOR, "Invalid BPS value");
 
         // Get asset prices in target digit precision (18 decimals)
@@ -218,7 +216,8 @@ contract ReaperSwapper is
         ChainlinkResponse memory prevChainlinkResponse =
             _getPrevChainlinkResponse(_token, chainlinkResponse.roundId, chainlinkResponse.decimals);
         require(
-            !_chainlinkIsBroken(chainlinkResponse, prevChainlinkResponse) && !_chainlinkIsFrozen(chainlinkResponse),
+            !_chainlinkIsBroken(chainlinkResponse, prevChainlinkResponse)
+                && !_chainlinkIsFrozen(chainlinkResponse, _token),
             "PriceFeed: Chainlink must be working and current"
         );
         price = _scaleChainlinkPriceByDigits(uint256(chainlinkResponse.answer), chainlinkResponse.decimals);
@@ -230,7 +229,7 @@ contract ReaperSwapper is
         returns (ChainlinkResponse memory chainlinkResponse)
     {
         // First, try to get current decimal precision:
-        try priceAggregator[_token].decimals() returns (uint8 decimals) {
+        try aggregatorData[_token].aggregator.decimals() returns (uint8 decimals) {
             // If call to Chainlink succeeds, record the current decimal precision
             chainlinkResponse.decimals = decimals;
         } catch {
@@ -239,7 +238,7 @@ contract ReaperSwapper is
         }
 
         // Secondly, try to get latest price data:
-        try priceAggregator[_token].latestRoundData() returns (
+        try aggregatorData[_token].aggregator.latestRoundData() returns (
             uint80 roundId, int256 answer, uint256, /* startedAt */ uint256 timestamp, uint80 /* answeredInRound */
         ) {
             // If call to Chainlink succeeds, return the response and success = true
@@ -265,7 +264,7 @@ contract ReaperSwapper is
         */
 
         // Try to get the price data from the previous round:
-        try priceAggregator[_token].getRoundData(_currentRoundId - 1) returns (
+        try aggregatorData[_token].aggregator.getRoundData(_currentRoundId - 1) returns (
             uint80 roundId, int256 answer, uint256, /* startedAt */ uint256 timestamp, uint80 /* answeredInRound */
         ) {
             // If call to Chainlink succeeds, return the response and success = true
@@ -310,7 +309,8 @@ contract ReaperSwapper is
         return false;
     }
 
-    function _chainlinkIsFrozen(ChainlinkResponse memory _response) internal view returns (bool) {
+    function _chainlinkIsFrozen(ChainlinkResponse memory _response, address _token) internal view returns (bool) {
+        uint256 aggregatorTimeout = aggregatorData[_token].timeout;
         return block.timestamp - _response.timestamp > aggregatorTimeout;
     }
 

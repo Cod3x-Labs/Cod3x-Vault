@@ -36,9 +36,7 @@ interface ISwapper {
 
     function updateUniV3Quoter(address _router, address _quoter) external;
 
-    function updateTokenAggregator(address _token, address _aggregator) external;
-
-    function updateAggregatorTimeout(uint256 _timeout) external;
+    function updateTokenAggregator(address _token, address _aggregator, uint256 _timeout) external;
 
     function swapUniV2(
         address _from,
