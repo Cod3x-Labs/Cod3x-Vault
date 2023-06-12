@@ -10,20 +10,23 @@ import "./mixins/VeloSolidMixin.sol";
 import "./mixins/UniV3Mixin.sol";
 import "./mixins/ReaperAccessControl.sol";
 import "./libraries/ReaperMathUtils.sol";
-import "oz/token/ERC20/extensions/IERC20Metadata.sol";
-import "oz/token/ERC20/utils/SafeERC20.sol";
-import "oz/access/AccessControlEnumerable.sol";
+import "oz-upgradeable/access/AccessControlEnumerableUpgradeable.sol";
+import "oz-upgradeable/proxy/utils/Initializable.sol";
+import "oz-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "oz-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
+import "oz-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
 contract ReaperSwapper is
     UniV2Mixin,
     BalMixin,
     VeloSolidMixin,
     UniV3Mixin,
-    AccessControlEnumerable,
-    ReaperAccessControl
+    ReaperAccessControl,
+    UUPSUpgradeable,
+    AccessControlEnumerableUpgradeable
 {
     using ReaperMathUtils for uint256;
-    using SafeERC20 for IERC20Metadata;
+    using SafeERC20Upgradeable for IERC20MetadataUpgradeable;
 
     struct ChainlinkResponse {
         uint80 roundId;
@@ -45,6 +48,10 @@ contract ReaperSwapper is
      * {STRATEGIST} - Role conferred to authors of strategies, allows for setting swap paths.
      * {GUARDIAN} - Multisig requiring 2 signatures for setting quoters and CL aggregator addresses.
      *
+     * The DEFAULT_ADMIN_ROLE (in-built access control role) will be granted to a multisig requiring 4
+     * signatures. This role would have upgrading capability, as well as the ability to grant any other
+     * roles.
+     *
      * Note that roles are cascading. So any higher privileged role should be able to perform all the functions
      * of any lower privileged role.
      */
@@ -56,15 +63,28 @@ contract ReaperSwapper is
     // Use to calculate slippage when using CL aggregator for minAmountOut
     uint256 public constant PERCENT_DIVISOR = 10_000;
 
+    uint256 public constant UPGRADE_TIMELOCK = 48 hours; // minimum 48 hours for RF
+    uint256 public constant FUTURE_NEXT_PROPOSAL_TIME = 365 days * 100;
+    uint256 public upgradeProposalTime;
+
     // token => CL aggregator data mapping
     mapping(address => CLAggregatorData) public aggregatorData;
 
-    constructor(address[] memory _strategists, address _guardian) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() initializer {}
+
+    function initialize(address[] memory _strategists, address _guardian, address _superAdmin) public initializer {
+        __UUPSUpgradeable_init();
+        __AccessControlEnumerable_init();
+
         uint256 numStrategists = _strategists.length;
         for (uint256 i = 0; i < numStrategists; i = i.uncheckedInc()) {
             _grantRole(STRATEGIST, _strategists[i]);
         }
         _grantRole(GUARDIAN, _guardian);
+        _grantRole(DEFAULT_ADMIN_ROLE, _superAdmin);
+
+        clearUpgradeCooldown();
     }
 
     function updateUniV2SwapPath(address _tokenIn, address _tokenOut, address _router, address[] calldata _path)
@@ -176,11 +196,12 @@ contract ReaperSwapper is
         uint256 toPriceTargetDigits = _getChainlinkPriceTargetDigits(_from);
 
         // Get asset USD amounts in target digit precision (18 decimals)
-        uint256 fromAmountUsdTargetDigits = (_amountIn * fromPriceTargetDigits) / 10 ** IERC20Metadata(_from).decimals();
+        uint256 fromAmountUsdTargetDigits =
+            (_amountIn * fromPriceTargetDigits) / 10 ** IERC20MetadataUpgradeable(_from).decimals();
         uint256 toAmountUsdTargetDigits =
             fromAmountUsdTargetDigits * _minAmountOutData.absoluteOrBPSValue / PERCENT_DIVISOR;
 
-        minAmountOut = (toAmountUsdTargetDigits * 10 ** IERC20Metadata(_to).decimals()) / toPriceTargetDigits;
+        minAmountOut = (toAmountUsdTargetDigits * 10 ** IERC20MetadataUpgradeable(_to).decimals()) / toPriceTargetDigits;
     }
 
     /**
@@ -319,20 +340,55 @@ contract ReaperSwapper is
         return price;
     }
 
+    /**
+     * @dev This function must be called prior to upgrading the implementation.
+     *      It's required to wait UPGRADE_TIMELOCK seconds before executing the upgrade.
+     *      Strategists and roles with higher privilege can initiate this cooldown.
+     */
+    function initiateUpgradeCooldown() external {
+        _atLeastRole(STRATEGIST);
+        upgradeProposalTime = block.timestamp;
+    }
+
+    /**
+     * @dev This function is called:
+     *      - in initialize()
+     *      - as part of a successful upgrade
+     *      - manually to clear the upgrade cooldown.
+     * Guardian and roles with higher privilege can clear this cooldown.
+     */
+    function clearUpgradeCooldown() public {
+        _atLeastRole(GUARDIAN);
+        upgradeProposalTime = block.timestamp + FUTURE_NEXT_PROPOSAL_TIME;
+    }
+
+    /**
+     * @dev This function must be overriden simply for access control purposes.
+     *      Only DEFAULT_ADMIN_ROLE can upgrade the implementation once the timelock
+     *      has passed.
+     */
+    function _authorizeUpgrade(address) internal override {
+        _atLeastRole(DEFAULT_ADMIN_ROLE);
+        require(
+            upgradeProposalTime + UPGRADE_TIMELOCK < block.timestamp, "Upgrade cooldown not initiated or still ongoing"
+        );
+        clearUpgradeCooldown();
+    }
+
     modifier pullFromBefore(address _from, uint256 _amount) {
-        IERC20Metadata(_from).safeTransferFrom(msg.sender, address(this), _amount);
+        IERC20MetadataUpgradeable(_from).safeTransferFrom(msg.sender, address(this), _amount);
         _;
     }
 
     modifier pushFromAndToAfter(address _from, address _to) {
         _;
-        uint256 fromBal = IERC20Metadata(_from).balanceOf(address(this));
+        uint256 fromBal = IERC20MetadataUpgradeable(_from).balanceOf(address(this));
         if (fromBal != 0) {
-            IERC20Metadata(_from).safeTransfer(msg.sender, fromBal);
+            IERC20MetadataUpgradeable(_from).safeTransfer(msg.sender, fromBal);
         }
-        uint256 toBal = IERC20Metadata(_to).balanceOf(address(this));
+        uint256 toBal = IERC20MetadataUpgradeable(_to).balanceOf(address(this));
         if (toBal != 0) {
-            IERC20Metadata(_to).safeTransfer(msg.sender, toBal);
+            IERC20MetadataUpgradeable(_to).safeTransfer(msg.sender, toBal);
         }
     }
 }
