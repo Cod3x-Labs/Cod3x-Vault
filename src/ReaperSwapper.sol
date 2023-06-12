@@ -211,9 +211,10 @@ contract ReaperSwapper is
      *      order, for example, [SUPER-ADMIN, ADMIN, GUARDIAN, STRATEGIST].
      */
     function _cascadingAccessRoles() internal pure override returns (bytes32[] memory) {
-        bytes32[] memory cascadingAccessRoles = new bytes32[](2);
-        cascadingAccessRoles[0] = GUARDIAN;
-        cascadingAccessRoles[1] = STRATEGIST;
+        bytes32[] memory cascadingAccessRoles = new bytes32[](3);
+        cascadingAccessRoles[0] = DEFAULT_ADMIN_ROLE;
+        cascadingAccessRoles[1] = GUARDIAN;
+        cascadingAccessRoles[2] = STRATEGIST;
         return cascadingAccessRoles;
     }
 
