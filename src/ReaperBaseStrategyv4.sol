@@ -274,6 +274,7 @@ abstract contract ReaperBaseStrategyv4 is
 
     function setHarvestSwapStepAtIndex(SwapStep calldata _newStep, uint256 index) external {
         _atLeastRole(ADMIN);
+        require(index < swapSteps.length, "Invalid index");
         delete swapSteps[index].minAmountOutData;
         delete swapSteps[index];
         _verifySwapStep(_newStep);
@@ -303,15 +304,11 @@ abstract contract ReaperBaseStrategyv4 is
 
         if (_step.minAmountOutData.kind == MinAmountOutKind.ChainlinkBased) {
             require(_step.minAmountOutData.absoluteOrBPSValue <= PERCENT_DIVISOR, "Invalid BPS value for minAmountOut");
+            (address startTokenCLAggregator,) = swapper.aggregatorData(_step.start);
+            require(startTokenCLAggregator != address(0), "Start token CL aggregator not registered");
+            (address endTokenCLAggregator,) = swapper.aggregatorData(_step.end);
+            require(endTokenCLAggregator != address(0), "End token CL aggregator not registered");
         }
-    }
-
-    /**
-     * Only {ADMIN} or higher roles may update the swapper.
-     */
-    function setSwapper(address _newSwapper) external {
-        _atLeastRole(ADMIN);
-        swapper = ISwapper(_newSwapper);
     }
 
     /**

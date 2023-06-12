@@ -23,6 +23,8 @@ interface ISwapper {
 
     function uniV3Quoters(address _router) external returns (address);
 
+    function aggregatorData(address _token) external returns (address, uint256);
+
     function updateUniV2SwapPath(address _tokenIn, address _tokenOut, address _router, address[] calldata _path)
         external;
 
