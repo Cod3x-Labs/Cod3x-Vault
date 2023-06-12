@@ -63,8 +63,8 @@ abstract contract ReaperBaseStrategyv4 is
         ExchangeType exType;
         address start;
         address end;
-        ISwapper.MinAmountOutData minAmountOutData;
-        address exAddress; // router (vault for Bal)
+        MinAmountOutData minAmountOutData;
+        address exchangeAddress; // router (vault for Bal)
     }
 
     SwapStep[] public swapSteps;
@@ -208,13 +208,13 @@ abstract contract ReaperBaseStrategyv4 is
             startToken.safeApprove(address(swapper), 0);
             startToken.safeIncreaseAllowance(address(swapper), amount);
             if (step.exType == ExchangeType.UniV2) {
-                swapper.swapUniV2(step.start, step.end, amount, step.minAmountOutData, step.exAddress);
+                swapper.swapUniV2(step.start, step.end, amount, step.minAmountOutData, step.exchangeAddress);
             } else if (step.exType == ExchangeType.Bal) {
-                swapper.swapBal(step.start, step.end, amount, step.minAmountOutData, step.exAddress);
+                swapper.swapBal(step.start, step.end, amount, step.minAmountOutData, step.exchangeAddress);
             } else if (step.exType == ExchangeType.VeloSolid) {
-                swapper.swapVelo(step.start, step.end, amount, step.minAmountOutData, step.exAddress);
+                swapper.swapVelo(step.start, step.end, amount, step.minAmountOutData, step.exchangeAddress);
             } else if (step.exType == ExchangeType.UniV3) {
-                swapper.swapUniV3(step.start, step.end, amount, step.minAmountOutData, step.exAddress);
+                swapper.swapUniV3(step.start, step.end, amount, step.minAmountOutData, step.exchangeAddress);
             }
         }
         _afterHarvestSwapSteps();
@@ -263,11 +263,6 @@ abstract contract ReaperBaseStrategyv4 is
      */
     function setHarvestSwapSteps(SwapStep[] calldata _newSteps) external {
         _atLeastRole(ADMIN);
-
-        uint256 numSteps = swapSteps.length;
-        for (uint256 i = 0; i < numSteps; i = i.uncheckedInc()) {
-            delete swapSteps[i].minAmountOutData;
-        }
         delete swapSteps;
 
         for (uint256 i = 0; i < _newSteps.length; i = i.uncheckedInc()) {
@@ -291,23 +286,23 @@ abstract contract ReaperBaseStrategyv4 is
         // if the innermost item of the mapping is an array, the view function instead adds
         // a uint parameter at the end of the view function.
         if (_step.exType == ExchangeType.UniV2) {
-            address pathElement = swapper.uniV2SwapPaths(_step.start, _step.end, _step.exAddress, 1);
+            address pathElement = swapper.uniV2SwapPaths(_step.start, _step.end, _step.exchangeAddress, 1);
             require(pathElement != address(0), "Path for step not registered in swapper");
         } else if (_step.exType == ExchangeType.Bal) {
-            bytes32 poolID = swapper.balSwapPoolIDs(_step.start, _step.end, _step.exAddress);
+            bytes32 poolID = swapper.balSwapPoolIDs(_step.start, _step.end, _step.exchangeAddress);
             require(poolID != bytes32(0), "Pool ID for step not registered in swapper");
         } else if (_step.exType == ExchangeType.VeloSolid) {
-            address pathElement = swapper.veloSwapPaths(_step.start, _step.end, _step.exAddress, 1);
+            address pathElement = swapper.veloSwapPaths(_step.start, _step.end, _step.exchangeAddress, 1);
             require(pathElement != address(0), "Path for step not registered in swapper");
         } else if (_step.exType == ExchangeType.UniV3) {
-            address pathElement = swapper.uniV3SwapPaths(_step.start, _step.end, _step.exAddress, 1);
+            address pathElement = swapper.uniV3SwapPaths(_step.start, _step.end, _step.exchangeAddress, 1);
             require(pathElement != address(0), "Path for step not registered in swapper");
-            address quoter = swapper.uniV3Quoters(_step.exAddress);
+            address quoter = swapper.uniV3Quoters(_step.exchangeAddress);
             require(quoter != address(0), "Quoter for provided router not registered in swapper");
         }
 
-        if (_step.minAmountOutData.kind == ISwapper.MinAmountOutKind.CLBased) {
-            require(_step.minAmountOutData.value <= PERCENT_DIVISOR, "Invalid BPS value for minAmountOut");
+        if (_step.minAmountOutData.kind == MinAmountOutKind.ChainlinkBased) {
+            require(_step.minAmountOutData.absoluteOrBPSValue <= PERCENT_DIVISOR, "Invalid BPS value for minAmountOut");
         }
     }
 

@@ -2,17 +2,17 @@
 
 pragma solidity ^0.8.0;
 
+enum MinAmountOutKind {
+    Absolute,
+    ChainlinkBased
+}
+
+struct MinAmountOutData {
+    MinAmountOutKind kind;
+    uint256 absoluteOrBPSValue; // for type "ChainlinkBased", value must be in BPS
+}
+
 interface ISwapper {
-    enum MinAmountOutKind {
-        Absolute,
-        CLBased
-    }
-
-    struct MinAmountOutData {
-        MinAmountOutKind kind;
-        uint256 value; // for type "CLBased", value must be in BPS
-    }
-
     function uniV2SwapPaths(address _from, address _to, address _router, uint256 _index) external returns (address);
 
     function balSwapPoolIDs(address _from, address _to, address _vault) external returns (bytes32);

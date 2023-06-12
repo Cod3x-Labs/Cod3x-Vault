@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "./interfaces/AggregatorV3Interface.sol";
+import "./interfaces/ISwapper.sol";
 import "./mixins/UniV2Mixin.sol";
 import "./mixins/BalMixin.sol";
 import "./mixins/VeloSolidMixin.sol";
@@ -30,16 +31,6 @@ contract ReaperSwapper is
         uint256 timestamp;
         bool success;
         uint8 decimals;
-    }
-
-    enum MinAmountOutKind {
-        Absolute,
-        CLBased
-    }
-
-    struct MinAmountOutData {
-        MinAmountOutKind kind;
-        uint256 value; // for type "CLBased", value must be in BPS
     }
 
     // timeout is maximum time period allowed since Chainlink's latest round data timestamp,
@@ -170,7 +161,7 @@ contract ReaperSwapper is
         MinAmountOutData memory _minAmountOutData
     ) internal view returns (uint256 minAmountOut) {
         if (_minAmountOutData.kind == MinAmountOutKind.Absolute) {
-            return _minAmountOutData.value;
+            return _minAmountOutData.absoluteOrBPSValue;
         }
 
         // Validate input
@@ -178,7 +169,7 @@ contract ReaperSwapper is
         require(address(fromAggregatorData.aggregator) != address(0), "CL aggregator not registered");
         CLAggregatorData storage toAggregatorData = aggregatorData[_to];
         require(address(toAggregatorData.aggregator) != address(0), "CL aggregator not registered");
-        require(_minAmountOutData.value <= PERCENT_DIVISOR, "Invalid BPS value");
+        require(_minAmountOutData.absoluteOrBPSValue <= PERCENT_DIVISOR, "Invalid BPS value");
 
         // Get asset prices in target digit precision (18 decimals)
         uint256 fromPriceTargetDigits = _getChainlinkPriceTargetDigits(_from);
@@ -186,7 +177,8 @@ contract ReaperSwapper is
 
         // Get asset USD amounts in target digit precision (18 decimals)
         uint256 fromAmountUsdTargetDigits = (_amountIn * fromPriceTargetDigits) / 10 ** IERC20Metadata(_from).decimals();
-        uint256 toAmountUsdTargetDigits = fromAmountUsdTargetDigits * _minAmountOutData.value / PERCENT_DIVISOR;
+        uint256 toAmountUsdTargetDigits =
+            fromAmountUsdTargetDigits * _minAmountOutData.absoluteOrBPSValue / PERCENT_DIVISOR;
 
         minAmountOut = (toAmountUsdTargetDigits * 10 ** IERC20Metadata(_to).decimals()) / toPriceTargetDigits;
     }
