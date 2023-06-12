@@ -83,6 +83,7 @@ contract ReaperSwapper is
         }
         _grantRole(GUARDIAN, _guardian);
         _grantRole(DEFAULT_ADMIN_ROLE, _superAdmin);
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
         clearUpgradeCooldown();
     }
