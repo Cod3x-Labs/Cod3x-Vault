@@ -12,15 +12,15 @@ import "../interfaces/ISwapErrors.sol";
 abstract contract BalMixin is ISwapErrors {
     using SafeERC20 for IERC20;
 
-    /// @dev tokenA => (tokenB => poolID): returns best poolID to swap
-    ///      tokenA to tokenB
-    mapping(address => mapping(address => bytes32)) public balSwapPoolIDs;
+    /// @dev tokenA => (tokenB => (vault => poolID)): returns best poolID to swap
+    ///      tokenA to tokenB for the given vault (protocol)
+    mapping(address => mapping(address => mapping(address => bytes32))) public balSwapPoolIDs;
 
     /**
-     * @dev Core harvest function. Swaps {_amount} of {_from} to {_to}.
+     * @dev Swaps {_amount} of {_from} to {_to} using {_vault}.
      * Prior to requesting the swap, allowance is increased if necessary.
      */
-    function _swapBal(address _from, address _to, uint256 _amount, uint256 _minAmountOut)
+    function _swapBal(address _from, address _to, uint256 _amount, uint256 _minAmountOut, address _vault)
         internal
         returns (uint256 amountOut)
     {
@@ -28,7 +28,7 @@ abstract contract BalMixin is ISwapErrors {
             return 0;
         }
 
-        bytes32 poolId = balSwapPoolIDs[_from][_to];
+        bytes32 poolId = balSwapPoolIDs[_from][_to][_vault];
         require(poolId != bytes32(0), "Missing pool for swap");
 
         IBeetVault.SingleSwap memory singleSwap;
@@ -45,28 +45,24 @@ abstract contract BalMixin is ISwapErrors {
         funds.recipient = payable(address(this));
         funds.toInternalBalance = false;
 
-        uint256 currentAllowance = IERC20(_from).allowance(address(this), _balVault());
+        uint256 currentAllowance = IERC20(_from).allowance(address(this), _vault);
 
         if (_amount > currentAllowance) {
-            IERC20(_from).safeIncreaseAllowance(_balVault(), _amount - currentAllowance);
+            IERC20(_from).safeIncreaseAllowance(_vault, _amount - currentAllowance);
         }
 
-        try IBeetVault(_balVault()).swap(singleSwap, funds, _minAmountOut, block.timestamp) returns (
-            uint256 tmpAmountOut
-        ) {
+        try IBeetVault(_vault).swap(singleSwap, funds, _minAmountOut, block.timestamp) returns (uint256 tmpAmountOut) {
             amountOut = tmpAmountOut;
         } catch {
-            emit SwapFailed(_balVault(), _amount, _minAmountOut, _from, _to);
+            emit SwapFailed(_vault, _amount, _minAmountOut, _from, _to);
         }
     }
 
-    function _balVault() internal view virtual returns (address);
-
-    /// @dev Update {SwapPoolId} for a specified pair of tokens.
-    function _updateBalSwapPoolID(address _tokenIn, address _tokenOut, bytes32 _poolID) internal {
+    /// @dev Update {SwapPoolId} for a specified pair of tokens and specified vault.
+    function _updateBalSwapPoolID(address _tokenIn, address _tokenOut, address _vault, bytes32 _poolID) internal {
         require(_tokenIn != address(0) && _tokenIn != _tokenOut, "Tokens must be different and not zero");
         IERC20[] memory poolTokens;
-        (poolTokens,,) = IBeetVault(_balVault()).getPoolTokens(_poolID);
+        (poolTokens,,) = IBeetVault(_vault).getPoolTokens(_poolID);
         bool tokenInFound;
         bool tokenOutFound;
 
@@ -76,9 +72,11 @@ abstract contract BalMixin is ISwapErrors {
         }
         require(tokenInFound && tokenOutFound, "Tokens not found in pool");
 
-        balSwapPoolIDs[_tokenIn][_tokenOut] = _poolID;
+        balSwapPoolIDs[_tokenIn][_tokenOut][_vault] = _poolID;
     }
 
     // Be sure to permission this in implementation
-    function updateBalSwapPoolID(address _tokenIn, address _tokenOut, bytes32 _poolID) external virtual;
+    function updateBalSwapPoolID(address _tokenIn, address _tokenOut, address _vault, bytes32 _poolID)
+        external
+        virtual;
 }

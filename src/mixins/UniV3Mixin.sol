@@ -8,39 +8,42 @@ import "../interfaces/IQuoter.sol";
 import "../libraries/TransferHelper.sol";
 
 abstract contract UniV3Mixin is ISwapErrors {
-    /// @dev tokenA => (tokenB => path): returns best path to swap
-    ///         tokenA to tokenB
-    mapping(address => mapping(address => address[])) public uniV3SwapPaths;
+    /// @dev tokenA => (tokenB => (router => path)): returns best path to swap
+    ///         tokenA to tokenB for the given router (protocol)
+    mapping(address => mapping(address => mapping(address => address[]))) public uniV3SwapPaths;
 
-    function _swapUniV3(
-        address _from,
-        address _to,
-        uint256 _amount,
-        uint256 _minAmountOut,
-        address _router,
-        address _quoter
-    ) internal returns (uint256 amountOut) {
-        address[] storage paths = uniV3SwapPaths[_from][_to];
-        require(paths.length >= 2, "Missing path for swap");
-        require(_amount != 0, "Invalid swap input");
+    /// @dev router => quoter mappings for UniV3
+    mapping(address => address) public uniV3Quoters;
+
+    function _swapUniV3(address _from, address _to, uint256 _amount, uint256 _minAmountOut, address _router)
+        internal
+        returns (uint256 amountOut)
+    {
+        if (_from == _to || _amount == 0) {
+            return 0;
+        }
+
+        address quoter = uniV3Quoters[_router];
+        address[] storage path = uniV3SwapPaths[_from][_to][_router];
+        require(quoter != address(0) && path.length >= 2, "Missing data for swap");
 
         uint256 amountIn = _amount;
-        uint24[] memory fees = new uint24[](paths.length - 1);
+        uint24[] memory fees = new uint24[](path.length - 1);
 
-        for (uint256 i = 0; i < paths.length - 1; i++) {
-            (uint24 optimalFee, uint256 highestAmountOut) = _getOptimalFee(amountIn, paths[i], paths[i + 1], _quoter);
+        for (uint256 i = 0; i < path.length - 1; i++) {
+            (uint24 optimalFee, uint256 highestAmountOut) = _getOptimalFee(amountIn, path[i], path[i + 1], quoter);
             if (highestAmountOut == 0) {
-                emit GetAmountsOutFailed(_router, amountIn, paths[i], paths[i + 1]);
+                emit GetAmountsOutFailed(_router, _amount, _from, _to);
                 return 0;
             }
             amountIn = highestAmountOut;
             fees[i] = optimalFee;
         }
 
-        bytes memory path = _encodePathV3(paths, fees);
-        TransferHelper.safeApprove(paths[0], _router, _amount);
+        bytes memory pathBytes = _encodePathV3(path, fees);
+        TransferHelper.safeApprove(path[0], _router, _amount);
         ISwapRouter.ExactInputParams memory params = ISwapRouter.ExactInputParams({
-            path: path,
+            path: pathBytes,
             recipient: address(this),
             deadline: block.timestamp,
             amountIn: _amount,
@@ -71,16 +74,29 @@ abstract contract UniV3Mixin is ISwapErrors {
         }
     }
 
-    /// @dev Update {SwapPath} for a specified pair of tokens.
-    function _updateUniV3SwapPath(address _tokenIn, address _tokenOut, address[] calldata _path) internal {
+    /// @dev Update {SwapPath} for a specified pair of tokens and router.
+    function _updateUniV3SwapPath(address _tokenIn, address _tokenOut, address _router, address[] calldata _path)
+        internal
+    {
         require(
             _tokenIn != _tokenOut && _path.length >= 2 && _path[0] == _tokenIn && _path[_path.length - 1] == _tokenOut
         );
-        uniV3SwapPaths[_tokenIn][_tokenOut] = _path;
+        uniV3SwapPaths[_tokenIn][_tokenOut][_router] = _path;
     }
 
     // Be sure to permission this in implementation
-    function updateUniV3SwapPath(address _tokenIn, address _tokenOut, address[] calldata _path) external virtual;
+    function updateUniV3SwapPath(address _tokenIn, address _tokenOut, address _router, address[] calldata _path)
+        external
+        virtual;
+
+    /// @dev Update {_quoter} for the specified {_router}.
+    function _updateUniV3Quoter(address _router, address _quoter) internal {
+        require(_router != address(0) && _quoter != address(0));
+        uniV3Quoters[_router] = _quoter;
+    }
+
+    // Be sure to permission this in implementation
+    function updateUniV3Quoter(address _router, address _quoter) external virtual;
 
     // Child contract may provide the possible set of Uni-V3 fee values (in basis points)
     // Here we provide a default set of 4 possible fee values
