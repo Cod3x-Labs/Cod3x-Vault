@@ -172,7 +172,7 @@ abstract contract ReaperBaseStrategyv4 is
             _harvestCore();
 
             uint256 allocated = IVault(vault).strategies(address(this)).allocated;
-            uint256 totalAssets = balanceOf();
+            uint256 totalAssets = _estimatedTotalAssets();
             uint256 toFree = MathUpgradeable.min(debt, totalAssets);
 
             if (totalAssets > allocated) {
@@ -218,6 +218,21 @@ abstract contract ReaperBaseStrategyv4 is
             }
         }
         _afterHarvestSwapSteps();
+    }
+
+    /**
+     * @dev This is a non-view function used to calculate the strategy's total
+     *      estimated holdings (in hand + in external contracts). It is invoked
+     *      during harvest() for PnL calculation purposes.
+     *
+     *      Typically this wouldn't need to be overridden as it just acts as a
+     *      pass-through to balanceOf(). But in case an implementation requires
+     *      special calculations (that may need state-changing operations) to
+     *      estimate the strategy's total holdings during harvest, this
+     *      function can be overridden.
+     */
+    function _estimatedTotalAssets() internal virtual returns (uint256) {
+        return balanceOf();
     }
 
     /**
