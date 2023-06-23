@@ -38,6 +38,7 @@ abstract contract UniV2Mixin is ISwapErrors {
         ) {
             amountOut = IERC20(_to).balanceOf(address(this)) - toBalBefore;
         } catch {
+            IERC20(_from).safeApprove(_router, 0);
             emit SwapFailed(_router, _amount, _minAmountOut, _from, _to);
         }
     }

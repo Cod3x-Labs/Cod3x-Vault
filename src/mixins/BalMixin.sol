@@ -47,6 +47,7 @@ abstract contract BalMixin is ISwapErrors {
 
         uint256 currentAllowance = IERC20(_from).allowance(address(this), _vault);
 
+        // Linear pool tokens have infinite allowance for the vault by default.
         if (_amount > currentAllowance) {
             IERC20(_from).safeIncreaseAllowance(_vault, _amount - currentAllowance);
         }
@@ -54,6 +55,10 @@ abstract contract BalMixin is ISwapErrors {
         try IBeetVault(_vault).swap(singleSwap, funds, _minAmountOut, block.timestamp) returns (uint256 tmpAmountOut) {
             amountOut = tmpAmountOut;
         } catch {
+            // Reset allowance iff we had to increase it.
+            if (_amount > currentAllowance) {
+                IERC20(_from).safeApprove(_vault, 0);
+            }
             emit SwapFailed(_vault, _amount, _minAmountOut, _from, _to);
         }
     }

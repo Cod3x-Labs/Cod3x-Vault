@@ -93,7 +93,7 @@ contract ReaperSwapper is
         override
     {
         _atLeastRole(STRATEGIST);
-        _updateVeloSwapPath(_tokenIn, _tokenOut, _router, _path);
+        _updateUniV2SwapPath(_tokenIn, _tokenOut, _router, _path);
     }
 
     function updateBalSwapPoolID(address _tokenIn, address _tokenOut, address _vault, bytes32 _poolID)

@@ -53,6 +53,7 @@ abstract contract UniV3Mixin is ISwapErrors {
         try ISwapRouter(_router).exactInput(params) returns (uint256 tmpAmountOut) {
             amountOut = tmpAmountOut;
         } catch {
+            TransferHelper.safeApprove(path[0], _router, 0);
             emit SwapFailed(_router, _amount, _minAmountOut, _from, _to);
         }
     }
