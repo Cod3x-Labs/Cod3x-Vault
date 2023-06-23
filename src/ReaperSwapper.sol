@@ -194,7 +194,7 @@ contract ReaperSwapper is
 
         // Get asset prices in target digit precision (18 decimals)
         uint256 fromPriceTargetDigits = _getChainlinkPriceTargetDigits(_from);
-        uint256 toPriceTargetDigits = _getChainlinkPriceTargetDigits(_from);
+        uint256 toPriceTargetDigits = _getChainlinkPriceTargetDigits(_to);
 
         // Get asset USD amounts in target digit precision (18 decimals)
         uint256 fromAmountUsdTargetDigits =
