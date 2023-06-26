@@ -290,7 +290,6 @@ abstract contract ReaperBaseStrategyv4 is
     function setHarvestSwapStepAtIndex(SwapStep calldata _newStep, uint256 index) external {
         _atLeastRole(ADMIN);
         require(index < swapSteps.length, "Invalid index");
-        delete swapSteps[index].minAmountOutData;
         delete swapSteps[index];
         _verifySwapStep(_newStep);
         swapSteps[index] = _newStep;
