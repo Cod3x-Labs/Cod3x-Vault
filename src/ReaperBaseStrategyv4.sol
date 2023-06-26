@@ -126,7 +126,7 @@ abstract contract ReaperBaseStrategyv4 is
 
         uint256 amountFreed = 0;
         (amountFreed, loss) = _liquidatePosition(_amount);
-        IERC20Upgradeable(want).safeTransfer(vault, amountFreed);
+        IERC20Upgradeable(want).safeTransfer(msg.sender, amountFreed);
     }
 
     /**
