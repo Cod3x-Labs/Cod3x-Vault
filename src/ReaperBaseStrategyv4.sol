@@ -319,10 +319,9 @@ abstract contract ReaperBaseStrategyv4 is
 
         if (_step.minAmountOutData.kind == MinAmountOutKind.ChainlinkBased) {
             require(_step.minAmountOutData.absoluteOrBPSValue <= PERCENT_DIVISOR, "Invalid BPS value for minAmountOut");
-            (address startTokenCLAggregator,) = swapper.aggregatorData(_step.start);
-            require(startTokenCLAggregator != address(0), "Start token CL aggregator not registered");
-            (address endTokenCLAggregator,) = swapper.aggregatorData(_step.end);
-            require(endTokenCLAggregator != address(0), "End token CL aggregator not registered");
+            // Fetch price from swapper to ensure aggregator is registered and working
+            swapper.getChainlinkPriceTargetDigits(_step.start);
+            swapper.getChainlinkPriceTargetDigits(_step.end);
         }
     }
 
