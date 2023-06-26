@@ -296,6 +296,11 @@ abstract contract ReaperBaseStrategyv4 is
     }
 
     function _verifySwapStep(SwapStep memory _step) internal {
+        // The start token of any step may not be {want} as we don't foresee the strategy
+        // needing to swap *out* of {want}. This also serves as a precautionary measure
+        // against attack vectors that rely on malicious swap steps.
+        require(_step.start != want, "Start token of step cannot be want");
+
         // Paths must be at least two elements long so we query the elements at index 1.
         // This is because in solidity's auto-generated view functions for mappings,
         // if the innermost item of the mapping is an array, the view function instead adds
