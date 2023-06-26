@@ -128,7 +128,8 @@ contract ReaperSwapper is
     function updateTokenAggregator(address _token, address _aggregator, uint256 _timeout) external {
         _atLeastRole(GUARDIAN);
         aggregatorData[_token] = CLAggregatorData(AggregatorV3Interface(_aggregator), _timeout);
-        _getChainlinkPriceTargetDigits(_token);
+        // Fetch price to ensure oracle is working
+        getChainlinkPriceTargetDigits(_token);
     }
 
     function swapUniV2(
@@ -193,8 +194,8 @@ contract ReaperSwapper is
         require(_minAmountOutData.absoluteOrBPSValue <= PERCENT_DIVISOR, "Invalid BPS value");
 
         // Get asset prices in target digit precision (18 decimals)
-        uint256 fromPriceTargetDigits = _getChainlinkPriceTargetDigits(_from);
-        uint256 toPriceTargetDigits = _getChainlinkPriceTargetDigits(_to);
+        uint256 fromPriceTargetDigits = getChainlinkPriceTargetDigits(_from);
+        uint256 toPriceTargetDigits = getChainlinkPriceTargetDigits(_to);
 
         // Get asset USD amounts in target digit precision (18 decimals)
         uint256 fromAmountUsdTargetDigits =
@@ -226,14 +227,21 @@ contract ReaperSwapper is
         return hasRole(_role, _account);
     }
 
-    function _getChainlinkPriceTargetDigits(address _token) internal view returns (uint256 price) {
+    /**
+     * Returns asset price from the Chainlink aggregator with 18 decimal precision.
+     * Reverts if:
+     * - asset doesn't have an aggregator registered
+     * - asset's aggregator is considered broken (doesn't have valid historical response)
+     * - asset's aggregator is considered frozen (last response exceeds asset's allowed timeout)
+     */
+    function getChainlinkPriceTargetDigits(address _token) public view returns (uint256 price) {
         ChainlinkResponse memory chainlinkResponse = _getCurrentChainlinkResponse(_token);
         ChainlinkResponse memory prevChainlinkResponse =
             _getPrevChainlinkResponse(_token, chainlinkResponse.roundId, chainlinkResponse.decimals);
         require(
             !_chainlinkIsBroken(chainlinkResponse, prevChainlinkResponse)
                 && !_chainlinkIsFrozen(chainlinkResponse, _token),
-            "PriceFeed: Chainlink must be working and current"
+            "ReaperSwapper: Chainlink must be working and current"
         );
         price = _scaleChainlinkPriceByDigits(uint256(chainlinkResponse.answer), chainlinkResponse.decimals);
     }
