@@ -12,6 +12,8 @@ import "../interfaces/ISwapErrors.sol";
 abstract contract BalMixin is ISwapErrors {
     using SafeERC20 for IERC20;
 
+    event BalSwapPoolIDUpdated(address indexed from, address indexed to, address indexed vault, bytes32 poolID);
+
     /// @dev tokenA => (tokenB => (vault => poolID)): returns best poolID to swap
     ///      tokenA to tokenB for the given vault (protocol)
     mapping(address => mapping(address => mapping(address => bytes32))) public balSwapPoolIDs;
@@ -78,6 +80,7 @@ abstract contract BalMixin is ISwapErrors {
         require(tokenInFound && tokenOutFound, "Tokens not found in pool");
 
         balSwapPoolIDs[_tokenIn][_tokenOut][_vault] = _poolID;
+        emit BalSwapPoolIDUpdated(_tokenIn, _tokenOut, _vault, _poolID);
     }
 
     // Be sure to permission this in implementation

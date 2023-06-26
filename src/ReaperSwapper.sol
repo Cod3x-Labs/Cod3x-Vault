@@ -28,6 +28,8 @@ contract ReaperSwapper is
     using ReaperMathUtils for uint256;
     using SafeERC20Upgradeable for IERC20MetadataUpgradeable;
 
+    event ChainlinkAggregatorDataUpdated(address indexed token, address indexed aggregator, uint256 timeout);
+
     struct ChainlinkResponse {
         uint80 roundId;
         int256 answer;
@@ -130,6 +132,7 @@ contract ReaperSwapper is
         aggregatorData[_token] = CLAggregatorData(AggregatorV3Interface(_aggregator), _timeout);
         // Fetch price to ensure oracle is working
         getChainlinkPriceTargetDigits(_token);
+        emit ChainlinkAggregatorDataUpdated(_token, _aggregator, _timeout);
     }
 
     function swapUniV2(
