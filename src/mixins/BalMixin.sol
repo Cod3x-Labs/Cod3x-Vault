@@ -12,6 +12,8 @@ import "../interfaces/ISwapErrors.sol";
 abstract contract BalMixin is ISwapErrors {
     using SafeERC20 for IERC20;
 
+    event BalSwapPoolIDUpdated(address indexed from, address indexed to, address indexed vault, bytes32 poolID);
+
     /// @dev tokenA => (tokenB => (vault => poolID)): returns best poolID to swap
     ///      tokenA to tokenB for the given vault (protocol)
     mapping(address => mapping(address => mapping(address => bytes32))) public balSwapPoolIDs;
@@ -47,6 +49,7 @@ abstract contract BalMixin is ISwapErrors {
 
         uint256 currentAllowance = IERC20(_from).allowance(address(this), _vault);
 
+        // Linear pool tokens have infinite allowance for the vault by default.
         if (_amount > currentAllowance) {
             IERC20(_from).safeIncreaseAllowance(_vault, _amount - currentAllowance);
         }
@@ -54,6 +57,10 @@ abstract contract BalMixin is ISwapErrors {
         try IBeetVault(_vault).swap(singleSwap, funds, _minAmountOut, block.timestamp) returns (uint256 tmpAmountOut) {
             amountOut = tmpAmountOut;
         } catch {
+            // Reset allowance iff we had to increase it.
+            if (_amount > currentAllowance) {
+                IERC20(_from).safeApprove(_vault, 0);
+            }
             emit SwapFailed(_vault, _amount, _minAmountOut, _from, _to);
         }
     }
@@ -73,6 +80,7 @@ abstract contract BalMixin is ISwapErrors {
         require(tokenInFound && tokenOutFound, "Tokens not found in pool");
 
         balSwapPoolIDs[_tokenIn][_tokenOut][_vault] = _poolID;
+        emit BalSwapPoolIDUpdated(_tokenIn, _tokenOut, _vault, _poolID);
     }
 
     // Be sure to permission this in implementation

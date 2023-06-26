@@ -71,4 +71,13 @@ interface ISwapper {
         MinAmountOutData memory _minAmountOutData,
         address _router
     ) external;
+
+    /**
+     * Returns asset price from the Chainlink aggregator with 18 decimal precision.
+     * Reverts if:
+     * - asset doesn't have an aggregator registered
+     * - asset's aggregator is considered broken (doesn't have valid historical response)
+     * - asset's aggregator is considered frozen (last response exceeds asset's allowed timeout)
+     */
+    function getChainlinkPriceTargetDigits(address _token) external view returns (uint256 price);
 }

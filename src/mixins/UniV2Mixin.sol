@@ -10,6 +10,8 @@ import "../libraries/Babylonian.sol";
 abstract contract UniV2Mixin is ISwapErrors {
     using SafeERC20 for IERC20;
 
+    event UniV2SwapPathUpdated(address indexed from, address indexed to, address indexed router, address[] path);
+
     /// @dev tokenA => (tokenB => (router => path)): returns best path to swap
     ///         tokenA to tokenB for the given router (protocol)
     mapping(address => mapping(address => mapping(address => address[]))) public uniV2SwapPaths;
@@ -38,6 +40,7 @@ abstract contract UniV2Mixin is ISwapErrors {
         ) {
             amountOut = IERC20(_to).balanceOf(address(this)) - toBalBefore;
         } catch {
+            IERC20(_from).safeApprove(_router, 0);
             emit SwapFailed(_router, _amount, _minAmountOut, _from, _to);
         }
     }
@@ -91,6 +94,7 @@ abstract contract UniV2Mixin is ISwapErrors {
             _tokenIn != _tokenOut && _path.length >= 2 && _path[0] == _tokenIn && _path[_path.length - 1] == _tokenOut
         );
         uniV2SwapPaths[_tokenIn][_tokenOut][_router] = _path;
+        emit UniV2SwapPathUpdated(_tokenIn, _tokenOut, _router, _path);
     }
 
     // Be sure to permission this in implementation

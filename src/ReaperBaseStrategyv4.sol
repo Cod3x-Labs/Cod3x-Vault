@@ -126,7 +126,7 @@ abstract contract ReaperBaseStrategyv4 is
 
         uint256 amountFreed = 0;
         (amountFreed, loss) = _liquidatePosition(_amount);
-        IERC20Upgradeable(want).safeTransfer(vault, amountFreed);
+        IERC20Upgradeable(want).safeTransfer(msg.sender, amountFreed);
     }
 
     /**
@@ -290,13 +290,17 @@ abstract contract ReaperBaseStrategyv4 is
     function setHarvestSwapStepAtIndex(SwapStep calldata _newStep, uint256 index) external {
         _atLeastRole(ADMIN);
         require(index < swapSteps.length, "Invalid index");
-        delete swapSteps[index].minAmountOutData;
         delete swapSteps[index];
         _verifySwapStep(_newStep);
         swapSteps[index] = _newStep;
     }
 
     function _verifySwapStep(SwapStep memory _step) internal {
+        // The start token of any step may not be {want} as we don't foresee the strategy
+        // needing to swap *out* of {want}. This also serves as a precautionary measure
+        // against attack vectors that rely on malicious swap steps.
+        require(_step.start != want, "Start token of step cannot be want");
+
         // Paths must be at least two elements long so we query the elements at index 1.
         // This is because in solidity's auto-generated view functions for mappings,
         // if the innermost item of the mapping is an array, the view function instead adds
@@ -319,10 +323,9 @@ abstract contract ReaperBaseStrategyv4 is
 
         if (_step.minAmountOutData.kind == MinAmountOutKind.ChainlinkBased) {
             require(_step.minAmountOutData.absoluteOrBPSValue <= PERCENT_DIVISOR, "Invalid BPS value for minAmountOut");
-            (address startTokenCLAggregator,) = swapper.aggregatorData(_step.start);
-            require(startTokenCLAggregator != address(0), "Start token CL aggregator not registered");
-            (address endTokenCLAggregator,) = swapper.aggregatorData(_step.end);
-            require(endTokenCLAggregator != address(0), "End token CL aggregator not registered");
+            // Fetch price from swapper to ensure aggregator is registered and working
+            swapper.getChainlinkPriceTargetDigits(_step.start);
+            swapper.getChainlinkPriceTargetDigits(_step.end);
         }
     }
 

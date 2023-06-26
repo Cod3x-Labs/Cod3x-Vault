@@ -11,6 +11,8 @@ import "../libraries/Babylonian.sol";
 abstract contract VeloSolidMixin is ISwapErrors {
     using SafeERC20 for IERC20;
 
+    event VeloSwapPathUpdated(address indexed from, address indexed to, address indexed router, address[] path);
+
     /// @dev tokenA => (tokenB => (router => path): returns best path to swap
     ///         tokenA to tokenB for the given router (protocol)
     mapping(address => mapping(address => mapping(address => address[]))) public veloSwapPaths;
@@ -54,6 +56,7 @@ abstract contract VeloSolidMixin is ISwapErrors {
         try router.swapExactTokensForTokens(_amount, _minAmountOut, routes, address(this), block.timestamp) {
             amountOut = IERC20(_to).balanceOf(address(this)) - toBalBefore;
         } catch {
+            IERC20(_from).safeApprove(_router, 0);
             emit SwapFailed(_router, _amount, _minAmountOut, _from, _to);
         }
     }
@@ -89,6 +92,7 @@ abstract contract VeloSolidMixin is ISwapErrors {
             _tokenIn != _tokenOut && _path.length >= 2 && _path[0] == _tokenIn && _path[_path.length - 1] == _tokenOut
         );
         veloSwapPaths[_tokenIn][_tokenOut][_router] = _path;
+        emit VeloSwapPathUpdated(_tokenIn, _tokenOut, _router, _path);
     }
 
     // Be sure to permission this in implementation

@@ -28,6 +28,8 @@ contract ReaperSwapper is
     using ReaperMathUtils for uint256;
     using SafeERC20Upgradeable for IERC20MetadataUpgradeable;
 
+    event ChainlinkAggregatorDataUpdated(address indexed token, address indexed aggregator, uint256 timeout);
+
     struct ChainlinkResponse {
         uint80 roundId;
         int256 answer;
@@ -46,11 +48,14 @@ contract ReaperSwapper is
     /**
      * Reaper Roles in increasing order of privilege.
      * {STRATEGIST} - Role conferred to authors of strategies, allows for setting swap paths.
-     * {GUARDIAN} - Multisig requiring 2 signatures for setting quoters and CL aggregator addresses.
+     * {GUARDIAN} - Multisig requiring 2 signatures, for clearing upgrade cooldowns.
+     * {DEFAULT_ADMIN_ROLE} - Multisig requiring 4 signatures.
      *
-     * The DEFAULT_ADMIN_ROLE (in-built access control role) will be granted to a multisig requiring 4
-     * signatures. This role would have upgrading capability, as well as the ability to grant any other
-     * roles.
+     * The DEFAULT_ADMIN_ROLE (in-built access control role) would have the capability to:
+     * - set uniV3 quoters
+     * - set chainlink aggregators
+     * - upgrade this contract
+     * - grant roles
      *
      * Note that roles are cascading. So any higher privileged role should be able to perform all the functions
      * of any lower privileged role.
@@ -93,7 +98,7 @@ contract ReaperSwapper is
         override
     {
         _atLeastRole(STRATEGIST);
-        _updateVeloSwapPath(_tokenIn, _tokenOut, _router, _path);
+        _updateUniV2SwapPath(_tokenIn, _tokenOut, _router, _path);
     }
 
     function updateBalSwapPoolID(address _tokenIn, address _tokenOut, address _vault, bytes32 _poolID)
@@ -121,14 +126,16 @@ contract ReaperSwapper is
     }
 
     function updateUniV3Quoter(address _router, address _quoter) external override {
-        _atLeastRole(GUARDIAN);
+        _atLeastRole(DEFAULT_ADMIN_ROLE);
         _updateUniV3Quoter(_router, _quoter);
     }
 
     function updateTokenAggregator(address _token, address _aggregator, uint256 _timeout) external {
-        _atLeastRole(GUARDIAN);
+        _atLeastRole(DEFAULT_ADMIN_ROLE);
         aggregatorData[_token] = CLAggregatorData(AggregatorV3Interface(_aggregator), _timeout);
-        _getChainlinkPriceTargetDigits(_token);
+        // Fetch price to ensure oracle is working
+        getChainlinkPriceTargetDigits(_token);
+        emit ChainlinkAggregatorDataUpdated(_token, _aggregator, _timeout);
     }
 
     function swapUniV2(
@@ -193,8 +200,8 @@ contract ReaperSwapper is
         require(_minAmountOutData.absoluteOrBPSValue <= PERCENT_DIVISOR, "Invalid BPS value");
 
         // Get asset prices in target digit precision (18 decimals)
-        uint256 fromPriceTargetDigits = _getChainlinkPriceTargetDigits(_from);
-        uint256 toPriceTargetDigits = _getChainlinkPriceTargetDigits(_from);
+        uint256 fromPriceTargetDigits = getChainlinkPriceTargetDigits(_from);
+        uint256 toPriceTargetDigits = getChainlinkPriceTargetDigits(_to);
 
         // Get asset USD amounts in target digit precision (18 decimals)
         uint256 fromAmountUsdTargetDigits =
@@ -226,14 +233,21 @@ contract ReaperSwapper is
         return hasRole(_role, _account);
     }
 
-    function _getChainlinkPriceTargetDigits(address _token) internal view returns (uint256 price) {
+    /**
+     * Returns asset price from the Chainlink aggregator with 18 decimal precision.
+     * Reverts if:
+     * - asset doesn't have an aggregator registered
+     * - asset's aggregator is considered broken (doesn't have valid historical response)
+     * - asset's aggregator is considered frozen (last response exceeds asset's allowed timeout)
+     */
+    function getChainlinkPriceTargetDigits(address _token) public view returns (uint256 price) {
         ChainlinkResponse memory chainlinkResponse = _getCurrentChainlinkResponse(_token);
         ChainlinkResponse memory prevChainlinkResponse =
             _getPrevChainlinkResponse(_token, chainlinkResponse.roundId, chainlinkResponse.decimals);
         require(
             !_chainlinkIsBroken(chainlinkResponse, prevChainlinkResponse)
                 && !_chainlinkIsFrozen(chainlinkResponse, _token),
-            "PriceFeed: Chainlink must be working and current"
+            "ReaperSwapper: Chainlink must be working and current"
         );
         price = _scaleChainlinkPriceByDigits(uint256(chainlinkResponse.answer), chainlinkResponse.decimals);
     }

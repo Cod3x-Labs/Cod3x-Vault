@@ -8,6 +8,9 @@ import "../interfaces/IQuoter.sol";
 import "../libraries/TransferHelper.sol";
 
 abstract contract UniV3Mixin is ISwapErrors {
+    event UniV3SwapPathUpdated(address indexed from, address indexed to, address indexed router, address[] path);
+    event UniV3QuoterUpdated(address indexed router, address indexed quoter);
+
     /// @dev tokenA => (tokenB => (router => path)): returns best path to swap
     ///         tokenA to tokenB for the given router (protocol)
     mapping(address => mapping(address => mapping(address => address[]))) public uniV3SwapPaths;
@@ -53,6 +56,7 @@ abstract contract UniV3Mixin is ISwapErrors {
         try ISwapRouter(_router).exactInput(params) returns (uint256 tmpAmountOut) {
             amountOut = tmpAmountOut;
         } catch {
+            TransferHelper.safeApprove(path[0], _router, 0);
             emit SwapFailed(_router, _amount, _minAmountOut, _from, _to);
         }
     }
@@ -82,6 +86,7 @@ abstract contract UniV3Mixin is ISwapErrors {
             _tokenIn != _tokenOut && _path.length >= 2 && _path[0] == _tokenIn && _path[_path.length - 1] == _tokenOut
         );
         uniV3SwapPaths[_tokenIn][_tokenOut][_router] = _path;
+        emit UniV3SwapPathUpdated(_tokenIn, _tokenOut, _router, _path);
     }
 
     // Be sure to permission this in implementation
@@ -93,6 +98,7 @@ abstract contract UniV3Mixin is ISwapErrors {
     function _updateUniV3Quoter(address _router, address _quoter) internal {
         require(_router != address(0) && _quoter != address(0));
         uniV3Quoters[_router] = _quoter;
+        emit UniV3QuoterUpdated(_router, _quoter);
     }
 
     // Be sure to permission this in implementation
