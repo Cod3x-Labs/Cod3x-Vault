@@ -48,11 +48,14 @@ contract ReaperSwapper is
     /**
      * Reaper Roles in increasing order of privilege.
      * {STRATEGIST} - Role conferred to authors of strategies, allows for setting swap paths.
-     * {GUARDIAN} - Multisig requiring 2 signatures for setting quoters and CL aggregator addresses.
+     * {GUARDIAN} - Multisig requiring 2 signatures, for clearing upgrade cooldowns.
+     * {DEFAULT_ADMIN_ROLE} - Multisig requiring 4 signatures.
      *
-     * The DEFAULT_ADMIN_ROLE (in-built access control role) will be granted to a multisig requiring 4
-     * signatures. This role would have upgrading capability, as well as the ability to grant any other
-     * roles.
+     * The DEFAULT_ADMIN_ROLE (in-built access control role) would have the capability to:
+     * - set uniV3 quoters
+     * - set chainlink aggregators
+     * - upgrade this contract
+     * - grant roles
      *
      * Note that roles are cascading. So any higher privileged role should be able to perform all the functions
      * of any lower privileged role.
@@ -123,12 +126,12 @@ contract ReaperSwapper is
     }
 
     function updateUniV3Quoter(address _router, address _quoter) external override {
-        _atLeastRole(GUARDIAN);
+        _atLeastRole(DEFAULT_ADMIN_ROLE);
         _updateUniV3Quoter(_router, _quoter);
     }
 
     function updateTokenAggregator(address _token, address _aggregator, uint256 _timeout) external {
-        _atLeastRole(GUARDIAN);
+        _atLeastRole(DEFAULT_ADMIN_ROLE);
         aggregatorData[_token] = CLAggregatorData(AggregatorV3Interface(_aggregator), _timeout);
         // Fetch price to ensure oracle is working
         getChainlinkPriceTargetDigits(_token);
