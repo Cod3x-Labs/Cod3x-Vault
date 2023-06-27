@@ -77,6 +77,12 @@ abstract contract ReaperBaseStrategyv4 is
     address public vault;
     ISwapper public swapper;
 
+    /**
+     * @dev Custom errors:
+     * {InvalidExchangeType} - Emitted when handling an exchange type is not implemented
+     */
+    error InvalidExchangeType(uint256 exchangeType);
+
     uint256[50] private __gap;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -215,6 +221,8 @@ abstract contract ReaperBaseStrategyv4 is
                 swapper.swapVelo(step.start, step.end, amount, step.minAmountOutData, step.exchangeAddress);
             } else if (step.exType == ExchangeType.UniV3) {
                 swapper.swapUniV3(step.start, step.end, amount, step.minAmountOutData, step.exchangeAddress);
+            } else {
+                revert InvalidExchangeType(uint256(step.exType));
             }
         }
         _afterHarvestSwapSteps();
@@ -319,6 +327,8 @@ abstract contract ReaperBaseStrategyv4 is
             require(pathElement != address(0), "Path for step not registered in swapper");
             address quoter = swapper.uniV3Quoters(_step.exchangeAddress);
             require(quoter != address(0), "Quoter for provided router not registered in swapper");
+        } else {
+            revert InvalidExchangeType(uint256(_step.exType));
         }
 
         if (_step.minAmountOutData.kind == MinAmountOutKind.ChainlinkBased) {
