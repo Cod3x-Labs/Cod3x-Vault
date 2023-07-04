@@ -322,7 +322,7 @@ abstract contract ReaperBaseStrategyv4 is
             require(poolID != bytes32(0), "Pool ID for step not registered in swapper");
         } else if (_step.exType == ExchangeType.VeloSolid) {
             IVeloRouter.Route memory pathElement =
-                swapper.veloSwapPaths(_step.start, _step.end, _step.exchangeAddress, 1);
+                swapper.veloSwapPaths(_step.start, _step.end, _step.exchangeAddress, 0);
             require(pathElement.from != address(0), "Path for step not registered in swapper");
         } else if (_step.exType == ExchangeType.UniV3) {
             address pathElement = swapper.uniV3SwapPaths(_step.start, _step.end, _step.exchangeAddress, 1);
