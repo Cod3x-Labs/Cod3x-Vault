@@ -8,15 +8,24 @@ import "../interfaces/IQuoter.sol";
 import "../libraries/TransferHelper.sol";
 
 abstract contract UniV3Mixin is ISwapErrors {
-    event UniV3SwapPathUpdated(address indexed from, address indexed to, address indexed router, address[] path);
-    event UniV3SwapFeesUpdated(address indexed from, address indexed to, address indexed router, uint24[] fees);
+    event UniV3SwapPathUpdated(address indexed from, address indexed to, address indexed router, UniV3SwapData swapData);
 
     /// @dev tokenA => (tokenB => (router => path)): returns best path to swap
     ///         tokenA to tokenB for the given router (protocol)
-    mapping(address => mapping(address => mapping(address => address[]))) public uniV3SwapPaths;
-    /// @dev tokenA => (tokenB => (router => fees)): returns best fee tiers to swap
-    ///         tokenA to tokenB for the given router (protocol)
-    mapping(address => mapping(address => mapping(address => uint24[]))) public uniV3SwapFees;
+    mapping(address => mapping(address => mapping(address => UniV3SwapData))) internal _uniV3SwapPaths;
+
+    struct UniV3SwapData {
+        address[] path;
+        uint24[] fees;
+    }
+
+    function uniV3SwapPaths(address _tokenA, address _tokenB, address _router)
+        external
+        view
+        returns (UniV3SwapData memory)
+    {
+        return _uniV3SwapPaths[_tokenA][_tokenB][_router];
+    }
 
     function _swapUniV3(address _from, address _to, uint256 _amount, uint256 _minAmountOut, address _router)
         internal
@@ -26,8 +35,9 @@ abstract contract UniV3Mixin is ISwapErrors {
             return 0;
         }
 
-        address[] storage path = uniV3SwapPaths[_from][_to][_router];
-        uint24[] storage fees = uniV3SwapFees[_from][_to][_router];
+        UniV3SwapData storage swapPathAndFees = _uniV3SwapPaths[_from][_to][_router];
+        address[] storage path = swapPathAndFees.path;
+        uint24[] storage fees = swapPathAndFees.fees;
         require(path.length >= 2 && fees.length == path.length - 1, "Missing data for swap");
 
         bytes memory pathBytes = _encodePathV3(path, fees);
@@ -49,34 +59,25 @@ abstract contract UniV3Mixin is ISwapErrors {
     }
 
     /// @dev Update {SwapPath} for a specified pair of tokens and router.
-    function _updateUniV3SwapPath(address _tokenIn, address _tokenOut, address _router, address[] calldata _path)
+    function _updateUniV3SwapPath(address _tokenIn, address _tokenOut, address _router, UniV3SwapData calldata _swapPathAndFees)
         internal
     {
+        address[] calldata path = _swapPathAndFees.path;
+        uint24[] calldata fees = _swapPathAndFees.fees;
         require(
-            _tokenIn != _tokenOut && _path.length >= 2 && _path[0] == _tokenIn && _path[_path.length - 1] == _tokenOut
+            _tokenIn != _tokenOut && path.length >= 2 && path[0] == _tokenIn && path[path.length - 1] == _tokenOut
+            && fees.length == path.length - 1
         );
-        uniV3SwapPaths[_tokenIn][_tokenOut][_router] = _path;
-        emit UniV3SwapPathUpdated(_tokenIn, _tokenOut, _router, _path);
+        for (uint256 i = 0; i < fees.length; i++) {
+            bool isValidFee = fees[i] == 100 || fees[i] == 500 || fees[i] == 3_000 || fees[i] == 10_000;
+            require(isValidFee, "Invalid fee used");
+        }
+        _uniV3SwapPaths[_tokenIn][_tokenOut][_router] =  _swapPathAndFees;
+        emit UniV3SwapPathUpdated(_tokenIn, _tokenOut, _router,  _swapPathAndFees);
     }
 
     // Be sure to permission this in implementation
-    function updateUniV3SwapPath(address _tokenIn, address _tokenOut, address _router, address[] calldata _path)
-        external
-        virtual;
-
-    /// @dev Update the fee tiers used for a specified pair of tokens and router.
-    function _updateUniV3SwapFees(address _tokenIn, address _tokenOut, address _router, uint24[] calldata _fees)
-        internal
-    {
-        require(
-            _tokenIn != _tokenOut && _fees.length >= 1
-        );
-        uniV3SwapFees[_tokenIn][_tokenOut][_router] = _fees;
-        emit UniV3SwapFeesUpdated(_tokenIn, _tokenOut, _router, _fees);
-    }
-
-    // Be sure to permission this in implementation
-    function updateUniV3SwapFees(address _tokenIn, address _tokenOut, address _router, uint24[] calldata _fees)
+    function updateUniV3SwapPath(address _tokenIn, address _tokenOut, address _router, UniV3SwapData calldata _swapPathAndFees)
         external
         virtual;
 
