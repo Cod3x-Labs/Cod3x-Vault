@@ -14,6 +14,11 @@ struct MinAmountOutData {
     uint256 absoluteOrBPSValue; // for type "ChainlinkBased", value must be in BPS
 }
 
+struct UniV3SwapData {
+    address[] path;
+    uint24[] fees;
+}
+
 interface ISwapper {
     function uniV2SwapPaths(address _from, address _to, address _router, uint256 _index) external returns (address);
 
@@ -23,9 +28,7 @@ interface ISwapper {
         external
         returns (IVeloRouter.Route memory route);
 
-    function uniV3SwapPaths(address _from, address _to, address _router, uint256 _index) external returns (address);
-
-    function uniV3Quoters(address _router) external returns (address);
+    function uniV3SwapPaths(address _from, address _to, address _router) external view returns (UniV3SwapData memory);
 
     function aggregatorData(address _token) external returns (address, uint256);
 
@@ -41,10 +44,12 @@ interface ISwapper {
         IVeloRouter.Route[] calldata _path
     ) external;
 
-    function updateUniV3SwapPath(address _tokenIn, address _tokenOut, address _router, address[] calldata _path)
-        external;
-
-    function updateUniV3Quoter(address _router, address _quoter) external;
+    function updateUniV3SwapPath(
+        address _tokenIn,
+        address _tokenOut,
+        address _router,
+        UniV3SwapData calldata _swapPathAndFees
+    ) external;
 
     function updateTokenAggregator(address _token, address _aggregator, uint256 _timeout) external;
 
