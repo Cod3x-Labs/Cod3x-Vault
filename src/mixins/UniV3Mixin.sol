@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import "../interfaces/ISwapErrors.sol";
 import "../interfaces/ISwapRouter.sol";
-import "../interfaces/IQuoter.sol";
+import "../interfaces/ISwapper.sol";
 import "../libraries/TransferHelper.sol";
 
 abstract contract UniV3Mixin is ISwapErrors {
@@ -15,11 +15,6 @@ abstract contract UniV3Mixin is ISwapErrors {
     /// @dev tokenA => (tokenB => (router => path)): returns best path to swap
     ///         tokenA to tokenB for the given router (protocol)
     mapping(address => mapping(address => mapping(address => UniV3SwapData))) internal _uniV3SwapPaths;
-
-    struct UniV3SwapData {
-        address[] path;
-        uint24[] fees;
-    }
 
     function uniV3SwapPaths(address _tokenA, address _tokenB, address _router)
         external
@@ -74,8 +69,7 @@ abstract contract UniV3Mixin is ISwapErrors {
                 && fees.length == path.length - 1
         );
         for (uint256 i = 0; i < fees.length; i++) {
-            bool isValidFee = fees[i] == 100 || fees[i] == 500 || fees[i] == 3_000 || fees[i] == 10_000;
-            require(isValidFee, "Invalid fee used");
+            require(_isValidFee(fees[i]), "Invalid fee used");
         }
         _uniV3SwapPaths[_tokenIn][_tokenOut][_router] = _swapPathAndFees;
         emit UniV3SwapPathUpdated(_tokenIn, _tokenOut, _router, _swapPathAndFees);
@@ -107,5 +101,11 @@ abstract contract UniV3Mixin is ISwapErrors {
         for (uint256 i = 0; i < _fees.length; i++) {
             encodedPath = abi.encodePacked(encodedPath, _fees[i], _path[i + 1]);
         }
+    }
+
+    // Child contract may provide the possible set of Uni-V3 fee values (in basis points)
+    // Here we provide a default set of 4 possible fee values
+    function _isValidFee(uint24 _fee) internal virtual returns (bool) {
+        return _fee == 100 || _fee == 500 || _fee == 3_000 || _fee == 10_000;
     }
 }

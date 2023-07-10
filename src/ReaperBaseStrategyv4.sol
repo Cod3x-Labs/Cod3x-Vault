@@ -325,10 +325,8 @@ abstract contract ReaperBaseStrategyv4 is
                 swapper.veloSwapPaths(_step.start, _step.end, _step.exchangeAddress, 0);
             require(pathElement.from != address(0), "Path for step not registered in swapper");
         } else if (_step.exType == ExchangeType.UniV3) {
-            address pathElement = swapper.uniV3SwapPaths(_step.start, _step.end, _step.exchangeAddress, 1);
-            require(pathElement != address(0), "Path for step not registered in swapper");
-            address quoter = swapper.uniV3Quoters(_step.exchangeAddress);
-            require(quoter != address(0), "Quoter for provided router not registered in swapper");
+            UniV3SwapData memory swapData = swapper.uniV3SwapPaths(_step.start, _step.end, _step.exchangeAddress);
+            require(swapData.path[0] != address(0), "Path for step not registered in swapper");
         } else {
             revert InvalidExchangeType(uint256(_step.exType));
         }
