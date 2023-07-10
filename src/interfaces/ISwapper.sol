@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.0;
 
+import "./IVeloRouter.sol";
+
 enum MinAmountOutKind {
     Absolute,
     ChainlinkBased
@@ -17,7 +19,9 @@ interface ISwapper {
 
     function balSwapPoolIDs(address _from, address _to, address _vault) external returns (bytes32);
 
-    function veloSwapPaths(address _from, address _to, address _router, uint256 _index) external returns (address);
+    function veloSwapPaths(address _from, address _to, address _router, uint256 _index)
+        external
+        returns (IVeloRouter.Route memory route);
 
     function uniV3SwapPaths(address _from, address _to, address _router, uint256 _index) external returns (address);
 
@@ -30,8 +34,12 @@ interface ISwapper {
 
     function updateBalSwapPoolID(address _tokenIn, address _tokenOut, address _vault, bytes32 _poolID) external;
 
-    function updateVeloSwapPath(address _tokenIn, address _tokenOut, address _router, address[] calldata _path)
-        external;
+    function updateVeloSwapPath(
+        address _tokenIn,
+        address _tokenOut,
+        address _router,
+        IVeloRouter.Route[] calldata _path
+    ) external;
 
     function updateUniV3SwapPath(address _tokenIn, address _tokenOut, address _router, address[] calldata _path)
         external;

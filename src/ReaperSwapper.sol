@@ -109,10 +109,12 @@ contract ReaperSwapper is
         _updateBalSwapPoolID(_tokenIn, _tokenOut, _vault, _poolID);
     }
 
-    function updateVeloSwapPath(address _tokenIn, address _tokenOut, address _router, address[] calldata _path)
-        external
-        override
-    {
+    function updateVeloSwapPath(
+        address _tokenIn,
+        address _tokenOut,
+        address _router,
+        IVeloRouter.Route[] calldata _path
+    ) external override {
         _atLeastRole(STRATEGIST);
         _updateVeloSwapPath(_tokenIn, _tokenOut, _router, _path);
     }

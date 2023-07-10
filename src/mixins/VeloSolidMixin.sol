@@ -11,11 +11,13 @@ import "../libraries/Babylonian.sol";
 abstract contract VeloSolidMixin is ISwapErrors {
     using SafeERC20 for IERC20;
 
-    event VeloSwapPathUpdated(address indexed from, address indexed to, address indexed router, address[] path);
+    event VeloSwapPathUpdated(
+        address indexed from, address indexed to, address indexed router, IVeloRouter.Route[] path
+    );
 
     /// @dev tokenA => (tokenB => (router => path): returns best path to swap
     ///         tokenA to tokenB for the given router (protocol)
-    mapping(address => mapping(address => mapping(address => address[]))) public veloSwapPaths;
+    mapping(address => mapping(address => mapping(address => IVeloRouter.Route[]))) public veloSwapPaths;
 
     /// @dev Helper function to swap {_from} to {_to} given an {_amount}.
     function _swapVelo(address _from, address _to, uint256 _amount, uint256 _minAmountOut, address _router)
@@ -25,35 +27,24 @@ abstract contract VeloSolidMixin is ISwapErrors {
         if (_from == _to || _amount == 0) {
             return 0;
         }
-        address[] storage path = veloSwapPaths[_from][_to][_router];
-        require(path.length >= 2, "Missing path for swap");
+        IVeloRouter.Route[] storage path = veloSwapPaths[_from][_to][_router];
+        require(path.length != 0, "Missing path for swap");
 
+        uint256 predictedOutput;
         IVeloRouter router = IVeloRouter(_router);
-        IVeloRouter.route[] memory routes = new IVeloRouter.route[](path.length - 1);
-        uint256 prevRouteOutput = _amount;
-
-        for (uint256 i = 0; i < routes.length; i++) {
-            uint256 output;
-            bool useStable;
-            try router.getAmountOut(prevRouteOutput, path[i], path[i + 1]) returns (
-                uint256 tmpOutput, bool tmpUseStable
-            ) {
-                output = tmpOutput;
-                useStable = tmpUseStable;
-            } catch {}
-
-            if (output == 0) {
-                emit GetAmountsOutFailed(_router, _amount, _from, _to);
-                return 0;
-            }
-
-            routes[i] = IVeloRouter.route({from: path[i], to: path[i + 1], stable: useStable});
-            prevRouteOutput = output;
+        try router.getAmountsOut(_amount, path) returns (uint256[] memory amounts) {
+            predictedOutput = amounts[amounts.length - 1];
+        } catch {}
+        if (predictedOutput == 0) {
+            emit GetAmountsOutFailed(_router, _amount, _from, _to);
+            return 0;
         }
 
         uint256 toBalBefore = IERC20(_to).balanceOf(address(this));
         IERC20(_from).safeIncreaseAllowance(_router, _amount);
-        try router.swapExactTokensForTokens(_amount, _minAmountOut, routes, address(this), block.timestamp) {
+        try router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+            _amount, _minAmountOut, path, address(this), block.timestamp
+        ) {
             amountOut = IERC20(_to).balanceOf(address(this)) - toBalBefore;
         } catch {
             IERC20(_from).safeApprove(_router, 0);
@@ -85,18 +76,28 @@ abstract contract VeloSolidMixin is ISwapErrors {
     }
 
     /// @dev Update {SwapPath} for a specified pair of tokens.
-    function _updateVeloSwapPath(address _tokenIn, address _tokenOut, address _router, address[] calldata _path)
-        internal
-    {
+    function _updateVeloSwapPath(
+        address _tokenIn,
+        address _tokenOut,
+        address _router,
+        IVeloRouter.Route[] calldata _path
+    ) internal {
         require(
-            _tokenIn != _tokenOut && _path.length >= 2 && _path[0] == _tokenIn && _path[_path.length - 1] == _tokenOut
+            _tokenIn != _tokenOut && _path.length != 0 && _path[0].from == _tokenIn
+                && _path[_path.length - 1].to == _tokenOut
         );
-        veloSwapPaths[_tokenIn][_tokenOut][_router] = _path;
+        delete veloSwapPaths[_tokenIn][_tokenOut][_router];
+        for (uint256 i = 0; i < _path.length; i++) {
+            veloSwapPaths[_tokenIn][_tokenOut][_router].push(_path[i]);
+        }
         emit VeloSwapPathUpdated(_tokenIn, _tokenOut, _router, _path);
     }
 
     // Be sure to permission this in implementation
-    function updateVeloSwapPath(address _tokenIn, address _tokenOut, address _router, address[] calldata _path)
-        external
-        virtual;
+    function updateVeloSwapPath(
+        address _tokenIn,
+        address _tokenOut,
+        address _router,
+        IVeloRouter.Route[] calldata _path
+    ) external virtual;
 }
