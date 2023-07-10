@@ -8,7 +8,9 @@ import "../interfaces/IQuoter.sol";
 import "../libraries/TransferHelper.sol";
 
 abstract contract UniV3Mixin is ISwapErrors {
-    event UniV3SwapPathUpdated(address indexed from, address indexed to, address indexed router, UniV3SwapData swapData);
+    event UniV3SwapPathUpdated(
+        address indexed from, address indexed to, address indexed router, UniV3SwapData swapData
+    );
 
     /// @dev tokenA => (tokenB => (router => path)): returns best path to swap
     ///         tokenA to tokenB for the given router (protocol)
@@ -59,27 +61,33 @@ abstract contract UniV3Mixin is ISwapErrors {
     }
 
     /// @dev Update {SwapPath} for a specified pair of tokens and router.
-    function _updateUniV3SwapPath(address _tokenIn, address _tokenOut, address _router, UniV3SwapData calldata _swapPathAndFees)
-        internal
-    {
+    function _updateUniV3SwapPath(
+        address _tokenIn,
+        address _tokenOut,
+        address _router,
+        UniV3SwapData calldata _swapPathAndFees
+    ) internal {
         address[] calldata path = _swapPathAndFees.path;
         uint24[] calldata fees = _swapPathAndFees.fees;
         require(
             _tokenIn != _tokenOut && path.length >= 2 && path[0] == _tokenIn && path[path.length - 1] == _tokenOut
-            && fees.length == path.length - 1
+                && fees.length == path.length - 1
         );
         for (uint256 i = 0; i < fees.length; i++) {
             bool isValidFee = fees[i] == 100 || fees[i] == 500 || fees[i] == 3_000 || fees[i] == 10_000;
             require(isValidFee, "Invalid fee used");
         }
-        _uniV3SwapPaths[_tokenIn][_tokenOut][_router] =  _swapPathAndFees;
-        emit UniV3SwapPathUpdated(_tokenIn, _tokenOut, _router,  _swapPathAndFees);
+        _uniV3SwapPaths[_tokenIn][_tokenOut][_router] = _swapPathAndFees;
+        emit UniV3SwapPathUpdated(_tokenIn, _tokenOut, _router, _swapPathAndFees);
     }
 
     // Be sure to permission this in implementation
-    function updateUniV3SwapPath(address _tokenIn, address _tokenOut, address _router, UniV3SwapData calldata _swapPathAndFees)
-        external
-        virtual;
+    function updateUniV3SwapPath(
+        address _tokenIn,
+        address _tokenOut,
+        address _router,
+        UniV3SwapData calldata _swapPathAndFees
+    ) external virtual;
 
     /**
      * Encode path / fees to bytes in the format expected by UniV3 router

@@ -119,10 +119,12 @@ contract ReaperSwapper is
         _updateVeloSwapPath(_tokenIn, _tokenOut, _router, _path);
     }
 
-    function updateUniV3SwapPath(address _tokenIn, address _tokenOut, address _router, UniV3SwapData calldata _swapPathAndFees)
-        external
-        override
-    {
+    function updateUniV3SwapPath(
+        address _tokenIn,
+        address _tokenOut,
+        address _router,
+        UniV3SwapData calldata _swapPathAndFees
+    ) external override {
         _atLeastRole(STRATEGIST);
         _updateUniV3SwapPath(_tokenIn, _tokenOut, _router, _swapPathAndFees);
     }
