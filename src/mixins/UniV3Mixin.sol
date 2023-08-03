@@ -25,7 +25,7 @@ abstract contract UniV3Mixin is ISwapErrors {
         return _uniV3SwapPaths[_tokenA][_tokenB][_router];
     }
 
-    function _swapUniV3(address _from, address _to, uint256 _amount, uint256 _minAmountOut, address _router)
+    function _swapUniV3(address _from, address _to, uint256 _amount, uint256 _minAmountOut, address _router, uint256 _deadline)
         internal
         returns (uint256 amountOut)
     {
@@ -43,7 +43,7 @@ abstract contract UniV3Mixin is ISwapErrors {
         ISwapRouter.ExactInputParams memory params = ISwapRouter.ExactInputParams({
             path: pathBytes,
             recipient: address(this),
-            deadline: block.timestamp,
+            deadline: _deadline,
             amountIn: _amount,
             amountOutMinimum: _minAmountOut
         });

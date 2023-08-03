@@ -58,7 +58,25 @@ interface ISwapper {
         address _to,
         uint256 _amount,
         MinAmountOutData memory _minAmountOutData,
+        address _router,
+        uint256 _deadline
+    ) external;
+
+    function swapUniV2(
+        address _from,
+        address _to,
+        uint256 _amount,
+        MinAmountOutData memory _minAmountOutData,
         address _router
+    ) external;
+
+    function swapBal(
+        address _from,
+        address _to,
+        uint256 _amount,
+        MinAmountOutData memory _minAmountOutData,
+        address _vault,
+        uint256 _deadline
     ) external;
 
     function swapBal(
@@ -74,7 +92,25 @@ interface ISwapper {
         address _to,
         uint256 _amount,
         MinAmountOutData memory _minAmountOutData,
+        address _router,
+        uint256 _deadline
+    ) external;
+
+    function swapVelo(
+        address _from,
+        address _to,
+        uint256 _amount,
+        MinAmountOutData memory _minAmountOutData,
         address _router
+    ) external;
+
+    function swapUniV3(
+        address _from,
+        address _to,
+        uint256 _amount,
+        MinAmountOutData memory _minAmountOutData,
+        address _router,
+        uint256 _deadline
     ) external;
 
     function swapUniV3(

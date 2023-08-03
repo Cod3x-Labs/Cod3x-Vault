@@ -21,7 +21,7 @@ abstract contract VeloSolidMixin is ISwapErrors {
     mapping(address => mapping(address => mapping(address => IVeloRouter.Route[]))) public veloSwapPaths;
 
     /// @dev Helper function to swap {_from} to {_to} given an {_amount}.
-    function _swapVelo(address _from, address _to, uint256 _amount, uint256 _minAmountOut, address _router)
+    function _swapVelo(address _from, address _to, uint256 _amount, uint256 _minAmountOut, address _router, uint256 _deadline)
         internal
         returns (uint256 amountOut)
     {
@@ -44,7 +44,7 @@ abstract contract VeloSolidMixin is ISwapErrors {
         uint256 toBalBefore = IERC20(_to).balanceOf(address(this));
         IERC20(_from).safeIncreaseAllowance(_router, _amount);
         try router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
-            _amount, _minAmountOut, path, address(this), block.timestamp
+            _amount, _minAmountOut, path, address(this), _deadline
         ) {
             amountOut = IERC20(_to).balanceOf(address(this)) - toBalBefore;
         } catch {
