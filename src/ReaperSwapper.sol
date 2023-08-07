@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "./interfaces/AggregatorV3Interface.sol";
-import "./interfaces/ISwapper.sol";
+import "./interfaces/ISwapperSwaps.sol";
 import "./mixins/UniV2Mixin.sol";
 import "./mixins/BalMixin.sol";
 import "./mixins/VeloSolidMixin.sol";
@@ -23,7 +23,8 @@ contract ReaperSwapper is
     UniV3Mixin,
     ReaperAccessControl,
     UUPSUpgradeable,
-    AccessControlEnumerableUpgradeable
+    AccessControlEnumerableUpgradeable,
+    ISwapperSwaps
 {
     using ReaperMathUtils for uint256;
     using SafeERC20Upgradeable for IERC20MetadataUpgradeable;
@@ -188,9 +189,9 @@ contract ReaperSwapper is
         MinAmountOutData memory _minAmountOutData,
         address _router,
         uint256 _deadline
-    ) public pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) {
+    ) public pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
         uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
-        _swapVelo(_from, _to, _amount, minAmountOut, _router, _deadline);
+        return _swapVelo(_from, _to, _amount, minAmountOut, _router, _deadline);
     }
 
     function swapVelo(
@@ -199,8 +200,8 @@ contract ReaperSwapper is
         uint256 _amount,
         MinAmountOutData memory _minAmountOutData,
         address _router
-    ) external {
-        swapVelo(_from, _to, _amount, _minAmountOutData, _router, block.timestamp);
+    ) external returns (uint256) {
+        return swapVelo(_from, _to, _amount, _minAmountOutData, _router, block.timestamp);
     }
 
     function swapUniV3(
