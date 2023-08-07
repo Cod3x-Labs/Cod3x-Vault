@@ -17,10 +17,14 @@ abstract contract UniV2Mixin is ISwapErrors {
     mapping(address => mapping(address => mapping(address => address[]))) public uniV2SwapPaths;
 
     /// @dev Helper function to swap {_from} to {_to} given an {_amount}.
-    function _swapUniV2(address _from, address _to, uint256 _amount, uint256 _minAmountOut, address _router)
-        internal
-        returns (uint256 amountOut)
-    {
+    function _swapUniV2(
+        address _from,
+        address _to,
+        uint256 _amount,
+        uint256 _minAmountOut,
+        address _router,
+        uint256 _deadline
+    ) internal returns (uint256 amountOut) {
         if (_from == _to || _amount == 0) {
             return 0;
         }
@@ -36,7 +40,7 @@ abstract contract UniV2Mixin is ISwapErrors {
         uint256 toBalBefore = IERC20(_to).balanceOf(address(this));
         IERC20(_from).safeIncreaseAllowance(_router, _amount);
         try IUniswapV2Router02(_router).swapExactTokensForTokensSupportingFeeOnTransferTokens(
-            _amount, _minAmountOut, path, address(this), block.timestamp
+            _amount, _minAmountOut, path, address(this), _deadline
         ) {
             amountOut = IERC20(_to).balanceOf(address(this)) - toBalBefore;
         } catch {
@@ -61,7 +65,7 @@ abstract contract UniV2Mixin is ISwapErrors {
     /**
      * @dev Core harvest function. Adds more liquidity using {lpToken0} and {lpToken1}.
      */
-    function _addLiquidityUniV2(address _lpToken0, address _lpToken1, address _router) internal {
+    function _addLiquidityUniV2(address _lpToken0, address _lpToken1, address _router, uint256 _deadline) internal {
         uint256 lp0Bal = IERC20(_lpToken0).balanceOf(address(this));
         uint256 lp1Bal = IERC20(_lpToken1).balanceOf(address(this));
 
@@ -69,7 +73,7 @@ abstract contract UniV2Mixin is ISwapErrors {
             IERC20(_lpToken0).safeIncreaseAllowance(_router, lp0Bal);
             IERC20(_lpToken1).safeIncreaseAllowance(_router, lp1Bal);
             IUniswapV2Router02(_router).addLiquidity(
-                _lpToken0, _lpToken1, lp0Bal, lp1Bal, 0, 0, address(this), block.timestamp
+                _lpToken0, _lpToken1, lp0Bal, lp1Bal, 0, 0, address(this), _deadline
             );
         }
     }

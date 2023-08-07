@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "./interfaces/AggregatorV3Interface.sol";
-import "./interfaces/ISwapper.sol";
+import "./interfaces/ISwapperSwaps.sol";
 import "./mixins/UniV2Mixin.sol";
 import "./mixins/BalMixin.sol";
 import "./mixins/VeloSolidMixin.sol";
@@ -23,7 +23,8 @@ contract ReaperSwapper is
     UniV3Mixin,
     ReaperAccessControl,
     UUPSUpgradeable,
-    AccessControlEnumerableUpgradeable
+    AccessControlEnumerableUpgradeable,
+    ISwapperSwaps
 {
     using ReaperMathUtils for uint256;
     using SafeERC20Upgradeable for IERC20MetadataUpgradeable;
@@ -142,10 +143,33 @@ contract ReaperSwapper is
         address _to,
         uint256 _amount,
         MinAmountOutData memory _minAmountOutData,
-        address _router
-    ) external pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
+        address _router,
+        uint256 _deadline
+    ) public pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
         uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
-        return _swapUniV2(_from, _to, _amount, minAmountOut, _router);
+        return _swapUniV2(_from, _to, _amount, minAmountOut, _router, _deadline);
+    }
+
+    function swapUniV2(
+        address _from,
+        address _to,
+        uint256 _amount,
+        MinAmountOutData memory _minAmountOutData,
+        address _router
+    ) external returns (uint256) {
+        return swapUniV2(_from, _to, _amount, _minAmountOutData, _router, block.timestamp);
+    }
+
+    function swapBal(
+        address _from,
+        address _to,
+        uint256 _amount,
+        MinAmountOutData memory _minAmountOutData,
+        address _vault,
+        uint256 _deadline
+    ) public pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
+        uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
+        return _swapBal(_from, _to, _amount, minAmountOut, _vault, _deadline);
     }
 
     function swapBal(
@@ -154,9 +178,20 @@ contract ReaperSwapper is
         uint256 _amount,
         MinAmountOutData memory _minAmountOutData,
         address _vault
-    ) external pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
+    ) external returns (uint256) {
+        return swapBal(_from, _to, _amount, _minAmountOutData, _vault, block.timestamp);
+    }
+
+    function swapVelo(
+        address _from,
+        address _to,
+        uint256 _amount,
+        MinAmountOutData memory _minAmountOutData,
+        address _router,
+        uint256 _deadline
+    ) public pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
         uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
-        return _swapBal(_from, _to, _amount, minAmountOut, _vault);
+        return _swapVelo(_from, _to, _amount, minAmountOut, _router, _deadline);
     }
 
     function swapVelo(
@@ -165,9 +200,20 @@ contract ReaperSwapper is
         uint256 _amount,
         MinAmountOutData memory _minAmountOutData,
         address _router
-    ) external pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) {
+    ) external returns (uint256) {
+        return swapVelo(_from, _to, _amount, _minAmountOutData, _router, block.timestamp);
+    }
+
+    function swapUniV3(
+        address _from,
+        address _to,
+        uint256 _amount,
+        MinAmountOutData memory _minAmountOutData,
+        address _router,
+        uint256 _deadline
+    ) public pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
         uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
-        _swapVelo(_from, _to, _amount, minAmountOut, _router);
+        return _swapUniV3(_from, _to, _amount, minAmountOut, _router, _deadline);
     }
 
     function swapUniV3(
@@ -176,9 +222,8 @@ contract ReaperSwapper is
         uint256 _amount,
         MinAmountOutData memory _minAmountOutData,
         address _router
-    ) external pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
-        uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
-        return _swapUniV3(_from, _to, _amount, minAmountOut, _router);
+    ) external returns (uint256) {
+        return swapUniV3(_from, _to, _amount, _minAmountOutData, _router, block.timestamp);
     }
 
     function _calculateMinAmountOut(

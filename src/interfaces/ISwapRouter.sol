@@ -3,10 +3,11 @@ pragma solidity >=0.7.5;
 pragma abicoder v2;
 
 import "./IUniswapV3SwapCallback.sol";
+import "./IPeripheryImmutableState.sol";
 
 /// @title Router token swapping functionality
 /// @notice Functions for swapping tokens via Uniswap V3
-interface ISwapRouter is IUniswapV3SwapCallback {
+interface ISwapRouter is IUniswapV3SwapCallback, IPeripheryImmutableState {
     struct ExactInputSingleParams {
         address tokenIn;
         address tokenOut;

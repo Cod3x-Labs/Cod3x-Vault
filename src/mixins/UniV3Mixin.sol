@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import "../interfaces/ISwapErrors.sol";
 import "../interfaces/ISwapRouter.sol";
 import "../interfaces/ISwapper.sol";
+import "../interfaces/IUniswapV3Factory.sol";
 import "../libraries/TransferHelper.sol";
 
 abstract contract UniV3Mixin is ISwapErrors {
@@ -24,10 +25,14 @@ abstract contract UniV3Mixin is ISwapErrors {
         return _uniV3SwapPaths[_tokenA][_tokenB][_router];
     }
 
-    function _swapUniV3(address _from, address _to, uint256 _amount, uint256 _minAmountOut, address _router)
-        internal
-        returns (uint256 amountOut)
-    {
+    function _swapUniV3(
+        address _from,
+        address _to,
+        uint256 _amount,
+        uint256 _minAmountOut,
+        address _router,
+        uint256 _deadline
+    ) internal returns (uint256 amountOut) {
         if (_from == _to || _amount == 0) {
             return 0;
         }
@@ -42,7 +47,7 @@ abstract contract UniV3Mixin is ISwapErrors {
         ISwapRouter.ExactInputParams memory params = ISwapRouter.ExactInputParams({
             path: pathBytes,
             recipient: address(this),
-            deadline: block.timestamp,
+            deadline: _deadline,
             amountIn: _amount,
             amountOutMinimum: _minAmountOut
         });
@@ -68,9 +73,13 @@ abstract contract UniV3Mixin is ISwapErrors {
             _tokenIn != _tokenOut && path.length >= 2 && path[0] == _tokenIn && path[path.length - 1] == _tokenOut
                 && fees.length == path.length - 1
         );
+        IUniswapV3Factory factory = IUniswapV3Factory(ISwapRouter(_router).factory());
         for (uint256 i = 0; i < fees.length; i++) {
+            address pool = factory.getPool(path[i], path[i + 1], fees[i]);
+            require(pool != address(0), "Pool does not exist");
             require(_isValidFee(fees[i]), "Invalid fee used");
         }
+
         _uniV3SwapPaths[_tokenIn][_tokenOut][_router] = _swapPathAndFees;
         emit UniV3SwapPathUpdated(_tokenIn, _tokenOut, _router, _swapPathAndFees);
     }

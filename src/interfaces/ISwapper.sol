@@ -3,23 +3,9 @@
 pragma solidity ^0.8.0;
 
 import "./IVeloRouter.sol";
+import "./ISwapperSwaps.sol";
 
-enum MinAmountOutKind {
-    Absolute,
-    ChainlinkBased
-}
-
-struct MinAmountOutData {
-    MinAmountOutKind kind;
-    uint256 absoluteOrBPSValue; // for type "ChainlinkBased", value must be in BPS
-}
-
-struct UniV3SwapData {
-    address[] path;
-    uint24[] fees;
-}
-
-interface ISwapper {
+interface ISwapper is ISwapperSwaps {
     function uniV2SwapPaths(address _from, address _to, address _router, uint256 _index) external returns (address);
 
     function balSwapPoolIDs(address _from, address _to, address _vault) external returns (bytes32);
@@ -52,38 +38,6 @@ interface ISwapper {
     ) external;
 
     function updateTokenAggregator(address _token, address _aggregator, uint256 _timeout) external;
-
-    function swapUniV2(
-        address _from,
-        address _to,
-        uint256 _amount,
-        MinAmountOutData memory _minAmountOutData,
-        address _router
-    ) external;
-
-    function swapBal(
-        address _from,
-        address _to,
-        uint256 _amount,
-        MinAmountOutData memory _minAmountOutData,
-        address _vault
-    ) external;
-
-    function swapVelo(
-        address _from,
-        address _to,
-        uint256 _amount,
-        MinAmountOutData memory _minAmountOutData,
-        address _router
-    ) external;
-
-    function swapUniV3(
-        address _from,
-        address _to,
-        uint256 _amount,
-        MinAmountOutData memory _minAmountOutData,
-        address _router
-    ) external;
 
     /**
      * Returns asset price from the Chainlink aggregator with 18 decimal precision.

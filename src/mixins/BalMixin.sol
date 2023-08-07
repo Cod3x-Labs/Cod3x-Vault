@@ -22,10 +22,14 @@ abstract contract BalMixin is ISwapErrors {
      * @dev Swaps {_amount} of {_from} to {_to} using {_vault}.
      * Prior to requesting the swap, allowance is increased if necessary.
      */
-    function _swapBal(address _from, address _to, uint256 _amount, uint256 _minAmountOut, address _vault)
-        internal
-        returns (uint256 amountOut)
-    {
+    function _swapBal(
+        address _from,
+        address _to,
+        uint256 _amount,
+        uint256 _minAmountOut,
+        address _vault,
+        uint256 _deadline
+    ) internal returns (uint256 amountOut) {
         if (_from == _to || _amount == 0) {
             return 0;
         }
@@ -54,7 +58,7 @@ abstract contract BalMixin is ISwapErrors {
             IERC20(_from).safeIncreaseAllowance(_vault, _amount - currentAllowance);
         }
 
-        try IBeetVault(_vault).swap(singleSwap, funds, _minAmountOut, block.timestamp) returns (uint256 tmpAmountOut) {
+        try IBeetVault(_vault).swap(singleSwap, funds, _minAmountOut, _deadline) returns (uint256 tmpAmountOut) {
             amountOut = tmpAmountOut;
         } catch {
             // Reset allowance iff we had to increase it.
