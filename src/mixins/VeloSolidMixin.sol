@@ -21,10 +21,14 @@ abstract contract VeloSolidMixin is ISwapErrors {
     mapping(address => mapping(address => mapping(address => IVeloRouter.Route[]))) public veloSwapPaths;
 
     /// @dev Helper function to swap {_from} to {_to} given an {_amount}.
-    function _swapVelo(address _from, address _to, uint256 _amount, uint256 _minAmountOut, address _router, uint256 _deadline)
-        internal
-        returns (uint256 amountOut)
-    {
+    function _swapVelo(
+        address _from,
+        address _to,
+        uint256 _amount,
+        uint256 _minAmountOut,
+        address _router,
+        uint256 _deadline
+    ) internal returns (uint256 amountOut) {
         if (_from == _to || _amount == 0) {
             return 0;
         }
@@ -89,8 +93,8 @@ abstract contract VeloSolidMixin is ISwapErrors {
         );
         delete veloSwapPaths[_tokenIn][_tokenOut][_router];
         for (uint256 i = 0; i < _path.length; i++) {
-            if (i <_path.length - 1) {
-                require(_path[i].to == _path[i+1].from);
+            if (i < _path.length - 1) {
+                require(_path[i].to == _path[i + 1].from);
                 IVeloV1AndV2Factory factory = IVeloV1AndV2Factory(_path[i].factory);
                 address pair = factory.getPair(_path[i].from, _path[i].to, _path[i].stable);
                 bool isPair = factory.isPair(pair);

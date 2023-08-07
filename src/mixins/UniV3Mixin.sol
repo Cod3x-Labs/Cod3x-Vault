@@ -25,10 +25,14 @@ abstract contract UniV3Mixin is ISwapErrors {
         return _uniV3SwapPaths[_tokenA][_tokenB][_router];
     }
 
-    function _swapUniV3(address _from, address _to, uint256 _amount, uint256 _minAmountOut, address _router, uint256 _deadline)
-        internal
-        returns (uint256 amountOut)
-    {
+    function _swapUniV3(
+        address _from,
+        address _to,
+        uint256 _amount,
+        uint256 _minAmountOut,
+        address _router,
+        uint256 _deadline
+    ) internal returns (uint256 amountOut) {
         if (_from == _to || _amount == 0) {
             return 0;
         }
@@ -71,11 +75,11 @@ abstract contract UniV3Mixin is ISwapErrors {
         );
         IUniswapV3Factory factory = IUniswapV3Factory(ISwapRouter(_router).factory());
         for (uint256 i = 0; i < fees.length; i++) {
-            address pool = factory.getPool(path[i], path[i+1], fees[i]);
+            address pool = factory.getPool(path[i], path[i + 1], fees[i]);
             require(pool != address(0), "Pool does not exist");
             require(_isValidFee(fees[i]), "Invalid fee used");
         }
-        
+
         _uniV3SwapPaths[_tokenIn][_tokenOut][_router] = _swapPathAndFees;
         emit UniV3SwapPathUpdated(_tokenIn, _tokenOut, _router, _swapPathAndFees);
     }

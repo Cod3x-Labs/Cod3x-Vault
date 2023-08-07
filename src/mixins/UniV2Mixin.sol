@@ -17,10 +17,14 @@ abstract contract UniV2Mixin is ISwapErrors {
     mapping(address => mapping(address => mapping(address => address[]))) public uniV2SwapPaths;
 
     /// @dev Helper function to swap {_from} to {_to} given an {_amount}.
-    function _swapUniV2(address _from, address _to, uint256 _amount, uint256 _minAmountOut, address _router, uint256 _deadline)
-        internal
-        returns (uint256 amountOut)
-    {
+    function _swapUniV2(
+        address _from,
+        address _to,
+        uint256 _amount,
+        uint256 _minAmountOut,
+        address _router,
+        uint256 _deadline
+    ) internal returns (uint256 amountOut) {
         if (_from == _to || _amount == 0) {
             return 0;
         }

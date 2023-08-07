@@ -22,10 +22,14 @@ abstract contract BalMixin is ISwapErrors {
      * @dev Swaps {_amount} of {_from} to {_to} using {_vault}.
      * Prior to requesting the swap, allowance is increased if necessary.
      */
-    function _swapBal(address _from, address _to, uint256 _amount, uint256 _minAmountOut, address _vault, uint256 _deadline)
-        internal
-        returns (uint256 amountOut)
-    {
+    function _swapBal(
+        address _from,
+        address _to,
+        uint256 _amount,
+        uint256 _minAmountOut,
+        address _vault,
+        uint256 _deadline
+    ) internal returns (uint256 amountOut) {
         if (_from == _to || _amount == 0) {
             return 0;
         }
