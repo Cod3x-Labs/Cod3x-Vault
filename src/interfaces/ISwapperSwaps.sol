@@ -12,6 +12,11 @@ struct MinAmountOutData {
     uint256 absoluteOrBPSValue; // for type "ChainlinkBased", value must be in BPS
 }
 
+struct UniV3SwapData {
+    address[] path;
+    uint24[] fees;
+}
+
 interface ISwapperSwaps {
     function swapUniV2(
         address _from,
