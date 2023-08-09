@@ -286,7 +286,7 @@ abstract contract ReaperBaseStrategyv4 is
      * Can be overriden to contain any additional swap step verification logic
      * that the inheriting strategy might need. Otherwise left unimplemented.
      */
-    function _verifySwapStepVirtual(SwapStep memory _step) internal virtual;
+    function _verifySwapStepVirtual(SwapStep memory _step) internal virtual {}
 
     function _verifySwapStep(SwapStep memory _step) internal {
         _verifySwapStepVirtual(_step);
