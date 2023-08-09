@@ -203,29 +203,7 @@ abstract contract ReaperBaseStrategyv4 is
 
     function _harvestCore() internal virtual {
         _beforeHarvestSwapSteps();
-        uint256 numSteps = swapSteps.length;
-        for (uint256 i = 0; i < numSteps; i = i.uncheckedInc()) {
-            SwapStep storage step = swapSteps[i];
-            IERC20Upgradeable startToken = IERC20Upgradeable(step.start);
-            uint256 amount = startToken.balanceOf(address(this));
-            if (amount == 0) {
-                continue;
-            }
-
-            startToken.safeApprove(address(swapper), 0);
-            startToken.safeIncreaseAllowance(address(swapper), amount);
-            if (step.exType == ExchangeType.UniV2) {
-                swapper.swapUniV2(step.start, step.end, amount, step.minAmountOutData, step.exchangeAddress);
-            } else if (step.exType == ExchangeType.Bal) {
-                swapper.swapBal(step.start, step.end, amount, step.minAmountOutData, step.exchangeAddress);
-            } else if (step.exType == ExchangeType.VeloSolid) {
-                swapper.swapVelo(step.start, step.end, amount, step.minAmountOutData, step.exchangeAddress);
-            } else if (step.exType == ExchangeType.UniV3) {
-                swapper.swapUniV3(step.start, step.end, amount, step.minAmountOutData, step.exchangeAddress);
-            } else {
-                revert InvalidExchangeType(uint256(step.exType));
-            }
-        }
+        _executeHarvestSwapSteps();
         _afterHarvestSwapSteps();
     }
 
@@ -304,7 +282,14 @@ abstract contract ReaperBaseStrategyv4 is
         swapSteps[index] = _newStep;
     }
 
+    /**
+     * Can be overriden to contain any additional swap step verification logic
+     * that the inheriting strategy might need. Otherwise left unimplemented.
+     */
+    function _verifySwapStepVirtual(SwapStep memory _step) internal virtual {}
+
     function _verifySwapStep(SwapStep memory _step) internal {
+        _verifySwapStepVirtual(_step);
         // The start token of any step may not be {want} as we don't foresee the strategy
         // needing to swap *out* of {want}. This also serves as a precautionary measure
         // against attack vectors that rely on malicious swap steps.
@@ -481,4 +466,33 @@ abstract contract ReaperBaseStrategyv4 is
      *      For example, adding liquidity, or anything else that cannot be accomplished with a dex swap.
      */
     function _afterHarvestSwapSteps() internal virtual {}
+
+    /**
+     * @dev Runs through all the harvest swap steps defined in {swapSteps}
+     */
+    function _executeHarvestSwapSteps() internal {
+        uint256 numSteps = swapSteps.length;
+        for (uint256 i = 0; i < numSteps; i = i.uncheckedInc()) {
+            SwapStep storage step = swapSteps[i];
+            IERC20Upgradeable startToken = IERC20Upgradeable(step.start);
+            uint256 amount = startToken.balanceOf(address(this));
+            if (amount == 0) {
+                continue;
+            }
+
+            startToken.safeApprove(address(swapper), 0);
+            startToken.safeIncreaseAllowance(address(swapper), amount);
+            if (step.exType == ExchangeType.UniV2) {
+                swapper.swapUniV2(step.start, step.end, amount, step.minAmountOutData, step.exchangeAddress);
+            } else if (step.exType == ExchangeType.Bal) {
+                swapper.swapBal(step.start, step.end, amount, step.minAmountOutData, step.exchangeAddress);
+            } else if (step.exType == ExchangeType.VeloSolid) {
+                swapper.swapVelo(step.start, step.end, amount, step.minAmountOutData, step.exchangeAddress);
+            } else if (step.exType == ExchangeType.UniV3) {
+                swapper.swapUniV3(step.start, step.end, amount, step.minAmountOutData, step.exchangeAddress);
+            } else {
+                revert InvalidExchangeType(uint256(step.exType));
+            }
+        }
+    }
 }
