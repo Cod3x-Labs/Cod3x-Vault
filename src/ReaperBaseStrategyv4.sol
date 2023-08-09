@@ -282,7 +282,14 @@ abstract contract ReaperBaseStrategyv4 is
         swapSteps[index] = _newStep;
     }
 
+    /**
+     * Can be overriden to contain any additional swap step verification logic
+     * that the inheriting strategy might need. Otherwise left unimplemented.
+     */
+    function _verifySwapStepVirtual(SwapStep memory _step) internal virtual;
+
     function _verifySwapStep(SwapStep memory _step) internal {
+        _verifySwapStepVirtual(_step);
         // The start token of any step may not be {want} as we don't foresee the strategy
         // needing to swap *out* of {want}. This also serves as a precautionary measure
         // against attack vectors that rely on malicious swap steps.
