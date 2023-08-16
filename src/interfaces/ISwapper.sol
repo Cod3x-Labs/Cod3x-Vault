@@ -18,7 +18,7 @@ interface ISwapper is ISwapperSwaps {
 
     function aggregatorData(address _token) external returns (address, uint256);
 
-    function updateUniV2SwapPath(address _tokenIn, address _tokenOut, address _router, address[] calldata _path)
+    function updateUniV2SwapPath(address _tokenIn, address _tokenOut, address _router, address[] memory _path)
         external;
 
     function updateBalSwapPoolID(address _tokenIn, address _tokenOut, address _vault, bytes32 _poolID) external;
@@ -27,14 +27,14 @@ interface ISwapper is ISwapperSwaps {
         address _tokenIn,
         address _tokenOut,
         address _router,
-        IVeloRouter.Route[] calldata _path
+        IVeloRouter.Route[] memory _path
     ) external;
 
     function updateUniV3SwapPath(
         address _tokenIn,
         address _tokenOut,
         address _router,
-        UniV3SwapData calldata _swapPathAndFees
+        UniV3SwapData memory _swapPathAndFees
     ) external;
 
     function updateTokenAggregator(address _token, address _aggregator, uint256 _timeout) external;

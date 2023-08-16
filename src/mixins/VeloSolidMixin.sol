@@ -85,7 +85,7 @@ abstract contract VeloSolidMixin is ISwapErrors {
         address _tokenIn,
         address _tokenOut,
         address _router,
-        IVeloRouter.Route[] calldata _path
+        IVeloRouter.Route[] memory _path
     ) internal {
         require(
             _tokenIn != _tokenOut && _path.length != 0 && _path[0].from == _tokenIn
@@ -110,6 +110,6 @@ abstract contract VeloSolidMixin is ISwapErrors {
         address _tokenIn,
         address _tokenOut,
         address _router,
-        IVeloRouter.Route[] calldata _path
+        IVeloRouter.Route[] memory _path
     ) external virtual;
 }

@@ -91,7 +91,7 @@ abstract contract UniV2Mixin is ISwapErrors {
     }
 
     /// @dev Update {SwapPath} for a specified pair of tokens.
-    function _updateUniV2SwapPath(address _tokenIn, address _tokenOut, address _router, address[] calldata _path)
+    function _updateUniV2SwapPath(address _tokenIn, address _tokenOut, address _router, address[] memory _path)
         internal
     {
         require(
@@ -102,7 +102,7 @@ abstract contract UniV2Mixin is ISwapErrors {
     }
 
     // Be sure to permission this in implementation
-    function updateUniV2SwapPath(address _tokenIn, address _tokenOut, address _router, address[] calldata _path)
+    function updateUniV2SwapPath(address _tokenIn, address _tokenOut, address _router, address[] memory _path)
         external
         virtual;
 }

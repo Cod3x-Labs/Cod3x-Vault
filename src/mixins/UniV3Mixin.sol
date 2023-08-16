@@ -65,10 +65,10 @@ abstract contract UniV3Mixin is ISwapErrors {
         address _tokenIn,
         address _tokenOut,
         address _router,
-        UniV3SwapData calldata _swapPathAndFees
+        UniV3SwapData memory _swapPathAndFees
     ) internal {
-        address[] calldata path = _swapPathAndFees.path;
-        uint24[] calldata fees = _swapPathAndFees.fees;
+        address[] memory path = _swapPathAndFees.path;
+        uint24[] memory fees = _swapPathAndFees.fees;
         require(
             _tokenIn != _tokenOut && path.length >= 2 && path[0] == _tokenIn && path[path.length - 1] == _tokenOut
                 && fees.length == path.length - 1
@@ -89,7 +89,7 @@ abstract contract UniV3Mixin is ISwapErrors {
         address _tokenIn,
         address _tokenOut,
         address _router,
-        UniV3SwapData calldata _swapPathAndFees
+        UniV3SwapData memory _swapPathAndFees
     ) external virtual;
 
     /**
