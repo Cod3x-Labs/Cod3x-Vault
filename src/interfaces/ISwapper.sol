@@ -23,12 +23,8 @@ interface ISwapper is ISwapperSwaps {
 
     function updateBalSwapPoolID(address _tokenIn, address _tokenOut, address _vault, bytes32 _poolID) external;
 
-    function updateVeloSwapPath(
-        address _tokenIn,
-        address _tokenOut,
-        address _router,
-        IVeloRouter.Route[] memory _path
-    ) external;
+    function updateVeloSwapPath(address _tokenIn, address _tokenOut, address _router, IVeloRouter.Route[] memory _path)
+        external;
 
     function updateUniV3SwapPath(
         address _tokenIn,
