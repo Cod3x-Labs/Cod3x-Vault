@@ -263,7 +263,7 @@ abstract contract ReaperBaseStrategyv4 is
      * Only {ADMIN} or higher roles may set the array
      * of swap steps executed as part of harvest.
      */
-    function setHarvestSwapSteps(SwapStep[] calldata _newSteps) external {
+    function setHarvestSwapSteps(SwapStep[] memory _newSteps) external {
         _atLeastRole(ADMIN);
         delete swapSteps;
 
@@ -274,7 +274,7 @@ abstract contract ReaperBaseStrategyv4 is
         }
     }
 
-    function setHarvestSwapStepAtIndex(SwapStep calldata _newStep, uint256 index) external {
+    function setHarvestSwapStepAtIndex(SwapStep memory _newStep, uint256 index) external {
         _atLeastRole(ADMIN);
         require(index < swapSteps.length, "Invalid index");
         delete swapSteps[index];

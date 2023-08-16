@@ -81,12 +81,9 @@ abstract contract VeloSolidMixin is ISwapErrors {
     }
 
     /// @dev Update {SwapPath} for a specified pair of tokens.
-    function _updateVeloSwapPath(
-        address _tokenIn,
-        address _tokenOut,
-        address _router,
-        IVeloRouter.Route[] calldata _path
-    ) internal {
+    function _updateVeloSwapPath(address _tokenIn, address _tokenOut, address _router, IVeloRouter.Route[] memory _path)
+        internal
+    {
         require(
             _tokenIn != _tokenOut && _path.length != 0 && _path[0].from == _tokenIn
                 && _path[_path.length - 1].to == _tokenOut
@@ -106,10 +103,7 @@ abstract contract VeloSolidMixin is ISwapErrors {
     }
 
     // Be sure to permission this in implementation
-    function updateVeloSwapPath(
-        address _tokenIn,
-        address _tokenOut,
-        address _router,
-        IVeloRouter.Route[] calldata _path
-    ) external virtual;
+    function updateVeloSwapPath(address _tokenIn, address _tokenOut, address _router, IVeloRouter.Route[] memory _path)
+        external
+        virtual;
 }

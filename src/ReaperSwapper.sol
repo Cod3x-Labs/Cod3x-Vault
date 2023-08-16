@@ -94,7 +94,7 @@ contract ReaperSwapper is
         clearUpgradeCooldown();
     }
 
-    function updateUniV2SwapPath(address _tokenIn, address _tokenOut, address _router, address[] calldata _path)
+    function updateUniV2SwapPath(address _tokenIn, address _tokenOut, address _router, address[] memory _path)
         external
         override
     {
@@ -110,12 +110,10 @@ contract ReaperSwapper is
         _updateBalSwapPoolID(_tokenIn, _tokenOut, _vault, _poolID);
     }
 
-    function updateVeloSwapPath(
-        address _tokenIn,
-        address _tokenOut,
-        address _router,
-        IVeloRouter.Route[] calldata _path
-    ) external override {
+    function updateVeloSwapPath(address _tokenIn, address _tokenOut, address _router, IVeloRouter.Route[] memory _path)
+        external
+        override
+    {
         _atLeastRole(STRATEGIST);
         _updateVeloSwapPath(_tokenIn, _tokenOut, _router, _path);
     }
@@ -124,7 +122,7 @@ contract ReaperSwapper is
         address _tokenIn,
         address _tokenOut,
         address _router,
-        UniV3SwapData calldata _swapPathAndFees
+        UniV3SwapData memory _swapPathAndFees
     ) external override {
         _atLeastRole(STRATEGIST);
         _updateUniV3SwapPath(_tokenIn, _tokenOut, _router, _swapPathAndFees);

@@ -256,7 +256,7 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
      * @notice Updates the withdrawalQueue to match the addresses and order specified.
      * @param _withdrawalQueue The new withdrawalQueue to update to.
      */
-    function setWithdrawalQueue(address[] calldata _withdrawalQueue) external {
+    function setWithdrawalQueue(address[] memory _withdrawalQueue) external {
         _atLeastRole(ADMIN);
         uint256 queueLength = _withdrawalQueue.length;
         require(queueLength != 0, "Queue must not be empty");
