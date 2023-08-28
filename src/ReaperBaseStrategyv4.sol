@@ -419,7 +419,7 @@ abstract contract ReaperBaseStrategyv4 is
         uint256 wantBal = balanceOfWant();
         if (wantBal < _amountNeeded) {
             _withdraw(_amountNeeded - wantBal);
-            liquidatedAmount = MathUpgradeable.min(_amountNeeded, balanceOfWant());
+            liquidatedAmount = balanceOfWant();
         } else {
             liquidatedAmount = _amountNeeded;
         }
