@@ -52,7 +52,7 @@ interface ISwapperSwaps {
         address _vault
     ) external returns (uint256);
 
-    function swapVelo(
+    function swapThenaRam(
         address _from,
         address _to,
         uint256 _amount,
@@ -61,7 +61,7 @@ interface ISwapperSwaps {
         uint256 _deadline
     ) external returns (uint256);
 
-    function swapVelo(
+    function swapThenaRam(
         address _from,
         address _to,
         uint256 _amount,

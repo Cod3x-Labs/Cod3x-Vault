@@ -6,8 +6,8 @@ import "./interfaces/AggregatorV3Interface.sol";
 import "./interfaces/ISwapperSwaps.sol";
 import "./mixins/UniV2Mixin.sol";
 import "./mixins/BalMixin.sol";
-import "./mixins/VeloSolidMixin.sol";
 import "./mixins/UniV3Mixin.sol";
+import "./mixins/ThenaRamMixin.sol";
 import "./mixins/ReaperAccessControl.sol";
 import "./libraries/ReaperMathUtils.sol";
 import "oz-upgradeable/access/AccessControlEnumerableUpgradeable.sol";
@@ -19,8 +19,8 @@ import "oz-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 contract ReaperSwapper is
     UniV2Mixin,
     BalMixin,
-    VeloSolidMixin,
     UniV3Mixin,
+    ThenaRamMixin,
     ReaperAccessControl,
     UUPSUpgradeable,
     AccessControlEnumerableUpgradeable,
@@ -109,13 +109,14 @@ contract ReaperSwapper is
         _atLeastRole(STRATEGIST);
         _updateBalSwapPoolID(_tokenIn, _tokenOut, _vault, _poolID);
     }
-
-    function updateVeloSwapPath(address _tokenIn, address _tokenOut, address _router, IVeloRouter.Route[] memory _path)
-        external
-        override
-    {
+        function updateThenaRamSwapPath(
+        address _tokenIn,
+        address _tokenOut,
+        address _router,
+        IThenaRamRouter.route[] memory _path
+    ) external override {
         _atLeastRole(STRATEGIST);
-        _updateVeloSwapPath(_tokenIn, _tokenOut, _router, _path);
+        _updateThenaRamSwapPath(_tokenIn, _tokenOut, _router, _path);
     }
 
     function updateUniV3SwapPath(
@@ -180,26 +181,52 @@ contract ReaperSwapper is
         return swapBal(_from, _to, _amount, _minAmountOutData, _vault, block.timestamp);
     }
 
-    function swapVelo(
+    function swapThenaRam(
         address _from,
         address _to,
         uint256 _amount,
         MinAmountOutData memory _minAmountOutData,
         address _router,
         uint256 _deadline
-    ) public pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
-        uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
-        return _swapVelo(_from, _to, _amount, minAmountOut, _router, _deadline);
+    )
+        public
+        pullFromBefore(_from, _amount)
+        pushFromAndToAfter(_from, _to)
+        returns (uint256)
+    {
+        uint256 minAmountOut = _calculateMinAmountOut(
+            _from,
+            _to,
+            _amount,
+            _minAmountOutData
+        );
+        return
+            _swapThenaRam(
+                _from,
+                _to,
+                _amount,
+                minAmountOut,
+                _router,
+                _deadline
+            );
     }
 
-    function swapVelo(
+    function swapThenaRam(
         address _from,
         address _to,
         uint256 _amount,
         MinAmountOutData memory _minAmountOutData,
         address _router
     ) external returns (uint256) {
-        return swapVelo(_from, _to, _amount, _minAmountOutData, _router, block.timestamp);
+        return
+            swapThenaRam(
+                _from,
+                _to,
+                _amount,
+                _minAmountOutData,
+                _router,
+                block.timestamp
+            );
     }
 
     function swapUniV3(
