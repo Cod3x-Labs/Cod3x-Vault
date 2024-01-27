@@ -31,7 +31,8 @@ abstract contract UniV3Mixin is ISwapErrors {
         uint256 _amount,
         uint256 _minAmountOut,
         address _router,
-        uint256 _deadline
+        uint256 _deadline,
+        bool _tryCatchActive
     ) internal returns (uint256 amountOut) {
         if (_from == _to || _amount == 0) {
             return 0;
@@ -52,12 +53,19 @@ abstract contract UniV3Mixin is ISwapErrors {
             amountOutMinimum: _minAmountOut
         });
 
-        try ISwapRouter(_router).exactInput(params) returns (uint256 tmpAmountOut) {
-            amountOut = tmpAmountOut;
-        } catch {
-            TransferHelper.safeApprove(path[0], _router, 0);
-            emit SwapFailed(_router, _amount, _minAmountOut, _from, _to);
+        // Based on configurable param catch fails or just revert
+        if(_tryCatchActive != false){
+            try ISwapRouter(_router).exactInput(params) returns (uint256 tmpAmountOut) {
+                amountOut = tmpAmountOut;
+            } catch {
+                TransferHelper.safeApprove(path[0], _router, 0);
+                emit SwapFailed(_router, _amount, _minAmountOut, _from, _to);
+            }
         }
+        else{
+            amountOut = ISwapRouter(_router).exactInput(params);
+        }
+
     }
 
     /// @dev Update {SwapPath} for a specified pair of tokens and router.

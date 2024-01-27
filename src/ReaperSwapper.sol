@@ -143,10 +143,11 @@ contract ReaperSwapper is
         uint256 _amount,
         MinAmountOutData memory _minAmountOutData,
         address _router,
-        uint256 _deadline
+        uint256 _deadline,
+        bool _tryCatchActive
     ) public pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
         uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
-        return _swapUniV2(_from, _to, _amount, minAmountOut, _router, _deadline);
+        return _swapUniV2(_from, _to, _amount, minAmountOut, _router, _deadline, _tryCatchActive);
     }
 
     function swapUniV2(
@@ -156,7 +157,7 @@ contract ReaperSwapper is
         MinAmountOutData memory _minAmountOutData,
         address _router
     ) external returns (uint256) {
-        return swapUniV2(_from, _to, _amount, _minAmountOutData, _router, block.timestamp);
+        return swapUniV2(_from, _to, _amount, _minAmountOutData, _router, block.timestamp, false);
     }
 
     function swapBal(
@@ -165,10 +166,11 @@ contract ReaperSwapper is
         uint256 _amount,
         MinAmountOutData memory _minAmountOutData,
         address _vault,
-        uint256 _deadline
+        uint256 _deadline,
+        bool _tryCatchActive
     ) public pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
         uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
-        return _swapBal(_from, _to, _amount, minAmountOut, _vault, _deadline);
+        return _swapBal(_from, _to, _amount, minAmountOut, _vault, _deadline, _tryCatchActive);
     }
 
     function swapBal(
@@ -178,7 +180,7 @@ contract ReaperSwapper is
         MinAmountOutData memory _minAmountOutData,
         address _vault
     ) external returns (uint256) {
-        return swapBal(_from, _to, _amount, _minAmountOutData, _vault, block.timestamp);
+        return swapBal(_from, _to, _amount, _minAmountOutData, _vault, block.timestamp, false);
     }
 
     function swapThenaRam(
@@ -187,7 +189,8 @@ contract ReaperSwapper is
         uint256 _amount,
         MinAmountOutData memory _minAmountOutData,
         address _router,
-        uint256 _deadline
+        uint256 _deadline,
+        bool _tryCatchActive
     )
         public
         pullFromBefore(_from, _amount)
@@ -207,7 +210,8 @@ contract ReaperSwapper is
                 _amount,
                 minAmountOut,
                 _router,
-                _deadline
+                _deadline,
+                _tryCatchActive
             );
     }
 
@@ -225,7 +229,8 @@ contract ReaperSwapper is
                 _amount,
                 _minAmountOutData,
                 _router,
-                block.timestamp
+                block.timestamp,
+                false
             );
     }
 
@@ -235,10 +240,11 @@ contract ReaperSwapper is
         uint256 _amount,
         MinAmountOutData memory _minAmountOutData,
         address _router,
-        uint256 _deadline
+        uint256 _deadline,
+        bool _tryCatchActive
     ) public pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
         uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
-        return _swapUniV3(_from, _to, _amount, minAmountOut, _router, _deadline);
+        return _swapUniV3(_from, _to, _amount, minAmountOut, _router, _deadline, _tryCatchActive);
     }
 
     function swapUniV3(
@@ -248,7 +254,7 @@ contract ReaperSwapper is
         MinAmountOutData memory _minAmountOutData,
         address _router
     ) external returns (uint256) {
-        return swapUniV3(_from, _to, _amount, _minAmountOutData, _router, block.timestamp);
+        return swapUniV3(_from, _to, _amount, _minAmountOutData, _router, block.timestamp, false);
     }
 
     function _calculateMinAmountOut(

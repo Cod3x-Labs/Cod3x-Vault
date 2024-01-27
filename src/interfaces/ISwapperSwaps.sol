@@ -24,7 +24,8 @@ interface ISwapperSwaps {
         uint256 _amount,
         MinAmountOutData memory _minAmountOutData,
         address _router,
-        uint256 _deadline
+        uint256 _deadline,
+        bool _tryCatchActive
     ) external returns (uint256);
 
     function swapUniV2(
@@ -41,7 +42,8 @@ interface ISwapperSwaps {
         uint256 _amount,
         MinAmountOutData memory _minAmountOutData,
         address _vault,
-        uint256 _deadline
+        uint256 _deadline,
+        bool _tryCatchActive
     ) external returns (uint256);
 
     function swapBal(
@@ -58,7 +60,8 @@ interface ISwapperSwaps {
         uint256 _amount,
         MinAmountOutData memory _minAmountOutData,
         address _router,
-        uint256 _deadline
+        uint256 _deadline,
+        bool _tryCatchActive
     ) external returns (uint256);
 
     function swapThenaRam(
@@ -75,7 +78,8 @@ interface ISwapperSwaps {
         uint256 _amount,
         MinAmountOutData memory _minAmountOutData,
         address _router,
-        uint256 _deadline
+        uint256 _deadline,
+        bool _tryCatchActive
     ) external returns (uint256);
 
     function swapUniV3(
