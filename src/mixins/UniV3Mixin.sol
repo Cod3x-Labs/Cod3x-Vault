@@ -25,45 +25,47 @@ abstract contract UniV3Mixin is ISwapErrors {
         return _uniV3SwapPaths[_tokenA][_tokenB][_router];
     }
 
-    function _swapUniV3(
-        address _from,
-        address _to,
-        uint256 _amount,
-        uint256 _minAmountOut,
-        address _router,
-        uint256 _deadline,
-        bool _tryCatchActive
-    ) internal returns (uint256 amountOut) {
-        if (_from == _to || _amount == 0) {
+    struct Params__swapUniV3 {
+        address from;
+        address to;
+        uint256 amount;
+        uint256 minAmountOut;
+        address router;
+        uint256 deadline;
+        bool tryCatchActive;
+    }
+
+    function _swapUniV3(Params__swapUniV3 memory _params) internal returns (uint256 amountOut) {
+        if (_params.from == _params.to || _params.amount == 0) {
             return 0;
         }
 
-        UniV3SwapData storage swapPathAndFees = _uniV3SwapPaths[_from][_to][_router];
+        UniV3SwapData storage swapPathAndFees = _uniV3SwapPaths[_params.from][_params.to][_params.router];
         address[] storage path = swapPathAndFees.path;
         uint24[] storage fees = swapPathAndFees.fees;
         require(path.length >= 2 && fees.length == path.length - 1, "Missing data for swap");
 
         bytes memory pathBytes = _encodePathV3(path, fees);
-        TransferHelper.safeApprove(path[0], _router, _amount);
+        TransferHelper.safeApprove(path[0], _params.router, _params.amount);
         ISwapRouter.ExactInputParams memory params = ISwapRouter.ExactInputParams({
             path: pathBytes,
             recipient: address(this),
-            deadline: _deadline,
-            amountIn: _amount,
-            amountOutMinimum: _minAmountOut
+            deadline: _params.deadline,
+            amountIn: _params.amount,
+            amountOutMinimum: _params.minAmountOut
         });
 
         // Based on configurable param catch fails or just revert
-        if(_tryCatchActive != false){
-            try ISwapRouter(_router).exactInput(params) returns (uint256 tmpAmountOut) {
+        if (_params.tryCatchActive) {
+            try ISwapRouter(_params.router).exactInput(params) returns (uint256 tmpAmountOut) {
                 amountOut = tmpAmountOut;
             } catch {
-                TransferHelper.safeApprove(path[0], _router, 0);
-                emit SwapFailed(_router, _amount, _minAmountOut, _from, _to);
+                TransferHelper.safeApprove(path[0], _params.router, 0);
+                emit SwapFailed(_params.router, _params.amount, _params.minAmountOut, _params.from, _params.to);
             }
         }
         else{
-            amountOut = ISwapRouter(_router).exactInput(params);
+            amountOut = ISwapRouter(_params.router).exactInput(params);
         }
 
     }

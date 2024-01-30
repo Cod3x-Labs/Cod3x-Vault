@@ -244,7 +244,7 @@ contract ReaperSwapper is
         bool _tryCatchActive
     ) public pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
         uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
-        return _swapUniV3(_from, _to, _amount, minAmountOut, _router, _deadline, _tryCatchActive);
+        return _swapUniV3(Params__swapUniV3(_from, _to, _amount, minAmountOut, _router, _deadline, _tryCatchActive));
     }
 
     function swapUniV3(
