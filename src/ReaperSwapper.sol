@@ -29,7 +29,11 @@ contract ReaperSwapper is
     using ReaperMathUtils for uint256;
     using SafeERC20Upgradeable for IERC20MetadataUpgradeable;
 
-    event ChainlinkAggregatorDataUpdated(address indexed token, address indexed aggregator, uint256 timeout);
+    event ChainlinkAggregatorDataUpdated(
+        address indexed token,
+        address indexed aggregator,
+        uint256 timeout
+    );
 
     struct ChainlinkResponse {
         uint80 roundId;
@@ -79,7 +83,11 @@ contract ReaperSwapper is
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-    function initialize(address[] memory _strategists, address _guardian, address _superAdmin) public initializer {
+    function initialize(
+        address[] memory _strategists,
+        address _guardian,
+        address _superAdmin
+    ) public initializer {
         __UUPSUpgradeable_init();
         __AccessControlEnumerable_init();
 
@@ -94,22 +102,27 @@ contract ReaperSwapper is
         clearUpgradeCooldown();
     }
 
-    function updateUniV2SwapPath(address _tokenIn, address _tokenOut, address _router, address[] memory _path)
-        external
-        override
-    {
+    function updateUniV2SwapPath(
+        address _tokenIn,
+        address _tokenOut,
+        address _router,
+        address[] memory _path
+    ) external override {
         _atLeastRole(STRATEGIST);
         _updateUniV2SwapPath(_tokenIn, _tokenOut, _router, _path);
     }
 
-    function updateBalSwapPoolID(address _tokenIn, address _tokenOut, address _vault, bytes32 _poolID)
-        external
-        override
-    {
+    function updateBalSwapPoolID(
+        address _tokenIn,
+        address _tokenOut,
+        address _vault,
+        bytes32 _poolID
+    ) external override {
         _atLeastRole(STRATEGIST);
         _updateBalSwapPoolID(_tokenIn, _tokenOut, _vault, _poolID);
     }
-        function updateThenaRamSwapPath(
+
+    function updateThenaRamSwapPath(
         address _tokenIn,
         address _tokenOut,
         address _router,
@@ -129,9 +142,16 @@ contract ReaperSwapper is
         _updateUniV3SwapPath(_tokenIn, _tokenOut, _router, _swapPathAndFees);
     }
 
-    function updateTokenAggregator(address _token, address _aggregator, uint256 _timeout) external {
+    function updateTokenAggregator(
+        address _token,
+        address _aggregator,
+        uint256 _timeout
+    ) external {
         _atLeastRole(DEFAULT_ADMIN_ROLE);
-        aggregatorData[_token] = CLAggregatorData(AggregatorV3Interface(_aggregator), _timeout);
+        aggregatorData[_token] = CLAggregatorData(
+            AggregatorV3Interface(_aggregator),
+            _timeout
+        );
         // Fetch price to ensure oracle is working
         getChainlinkPriceTargetDigits(_token);
         emit ChainlinkAggregatorDataUpdated(_token, _aggregator, _timeout);
@@ -145,9 +165,28 @@ contract ReaperSwapper is
         address _router,
         uint256 _deadline,
         bool _tryCatchActive
-    ) public pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
-        uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
-        return _swapUniV2(_from, _to, _amount, minAmountOut, _router, _deadline, _tryCatchActive);
+    )
+        public
+        pullFromBefore(_from, _amount)
+        pushFromAndToAfter(_from, _to)
+        returns (uint256)
+    {
+        uint256 minAmountOut = _calculateMinAmountOut(
+            _from,
+            _to,
+            _amount,
+            _minAmountOutData
+        );
+        return
+            _swapUniV2(
+                _from,
+                _to,
+                _amount,
+                minAmountOut,
+                _router,
+                _deadline,
+                _tryCatchActive
+            );
     }
 
     function swapUniV2(
@@ -157,7 +196,16 @@ contract ReaperSwapper is
         MinAmountOutData memory _minAmountOutData,
         address _router
     ) external returns (uint256) {
-        return swapUniV2(_from, _to, _amount, _minAmountOutData, _router, block.timestamp, false);
+        return
+            swapUniV2(
+                _from,
+                _to,
+                _amount,
+                _minAmountOutData,
+                _router,
+                block.timestamp,
+                true
+            );
     }
 
     function swapBal(
@@ -168,9 +216,28 @@ contract ReaperSwapper is
         address _vault,
         uint256 _deadline,
         bool _tryCatchActive
-    ) public pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
-        uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
-        return _swapBal(_from, _to, _amount, minAmountOut, _vault, _deadline, _tryCatchActive);
+    )
+        public
+        pullFromBefore(_from, _amount)
+        pushFromAndToAfter(_from, _to)
+        returns (uint256)
+    {
+        uint256 minAmountOut = _calculateMinAmountOut(
+            _from,
+            _to,
+            _amount,
+            _minAmountOutData
+        );
+        return
+            _swapBal(
+                _from,
+                _to,
+                _amount,
+                minAmountOut,
+                _vault,
+                _deadline,
+                _tryCatchActive
+            );
     }
 
     function swapBal(
@@ -180,7 +247,16 @@ contract ReaperSwapper is
         MinAmountOutData memory _minAmountOutData,
         address _vault
     ) external returns (uint256) {
-        return swapBal(_from, _to, _amount, _minAmountOutData, _vault, block.timestamp, false);
+        return
+            swapBal(
+                _from,
+                _to,
+                _amount,
+                _minAmountOutData,
+                _vault,
+                block.timestamp,
+                true
+            );
     }
 
     function swapThenaRam(
@@ -230,7 +306,7 @@ contract ReaperSwapper is
                 _minAmountOutData,
                 _router,
                 block.timestamp,
-                false
+                true
             );
     }
 
@@ -242,9 +318,30 @@ contract ReaperSwapper is
         address _router,
         uint256 _deadline,
         bool _tryCatchActive
-    ) public pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
-        uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
-        return _swapUniV3(Params__swapUniV3(_from, _to, _amount, minAmountOut, _router, _deadline, _tryCatchActive));
+    )
+        public
+        pullFromBefore(_from, _amount)
+        pushFromAndToAfter(_from, _to)
+        returns (uint256)
+    {
+        uint256 minAmountOut = _calculateMinAmountOut(
+            _from,
+            _to,
+            _amount,
+            _minAmountOutData
+        );
+        return
+            _swapUniV3(
+                Params__swapUniV3(
+                    _from,
+                    _to,
+                    _amount,
+                    minAmountOut,
+                    _router,
+                    _deadline,
+                    _tryCatchActive
+                )
+            );
     }
 
     function swapUniV3(
@@ -254,7 +351,16 @@ contract ReaperSwapper is
         MinAmountOutData memory _minAmountOutData,
         address _router
     ) external returns (uint256) {
-        return swapUniV3(_from, _to, _amount, _minAmountOutData, _router, block.timestamp, false);
+        return
+            swapUniV3(
+                _from,
+                _to,
+                _amount,
+                _minAmountOutData,
+                _router,
+                block.timestamp,
+                true
+            );
     }
 
     function _calculateMinAmountOut(
@@ -269,22 +375,35 @@ contract ReaperSwapper is
 
         // Validate input
         CLAggregatorData storage fromAggregatorData = aggregatorData[_from];
-        require(address(fromAggregatorData.aggregator) != address(0), "CL aggregator not registered");
+        require(
+            address(fromAggregatorData.aggregator) != address(0),
+            "CL aggregator not registered"
+        );
         CLAggregatorData storage toAggregatorData = aggregatorData[_to];
-        require(address(toAggregatorData.aggregator) != address(0), "CL aggregator not registered");
-        require(_minAmountOutData.absoluteOrBPSValue <= PERCENT_DIVISOR, "Invalid BPS value");
+        require(
+            address(toAggregatorData.aggregator) != address(0),
+            "CL aggregator not registered"
+        );
+        require(
+            _minAmountOutData.absoluteOrBPSValue <= PERCENT_DIVISOR,
+            "Invalid BPS value"
+        );
 
         // Get asset prices in target digit precision (18 decimals)
         uint256 fromPriceTargetDigits = getChainlinkPriceTargetDigits(_from);
         uint256 toPriceTargetDigits = getChainlinkPriceTargetDigits(_to);
 
         // Get asset USD amounts in target digit precision (18 decimals)
-        uint256 fromAmountUsdTargetDigits =
-            (_amountIn * fromPriceTargetDigits) / 10 ** IERC20MetadataUpgradeable(_from).decimals();
-        uint256 toAmountUsdTargetDigits =
-            fromAmountUsdTargetDigits * _minAmountOutData.absoluteOrBPSValue / PERCENT_DIVISOR;
+        uint256 fromAmountUsdTargetDigits = (_amountIn *
+            fromPriceTargetDigits) /
+            10 ** IERC20MetadataUpgradeable(_from).decimals();
+        uint256 toAmountUsdTargetDigits = (fromAmountUsdTargetDigits *
+            _minAmountOutData.absoluteOrBPSValue) / PERCENT_DIVISOR;
 
-        minAmountOut = (toAmountUsdTargetDigits * 10 ** IERC20MetadataUpgradeable(_to).decimals()) / toPriceTargetDigits;
+        minAmountOut =
+            (toAmountUsdTargetDigits *
+                10 ** IERC20MetadataUpgradeable(_to).decimals()) /
+            toPriceTargetDigits;
     }
 
     /**
@@ -292,7 +411,12 @@ contract ReaperSwapper is
      *      Subclasses should override this to specify their unique roles arranged in the correct
      *      order, for example, [SUPER-ADMIN, ADMIN, GUARDIAN, STRATEGIST].
      */
-    function _cascadingAccessRoles() internal pure override returns (bytes32[] memory) {
+    function _cascadingAccessRoles()
+        internal
+        pure
+        override
+        returns (bytes32[] memory)
+    {
         bytes32[] memory cascadingAccessRoles = new bytes32[](3);
         cascadingAccessRoles[0] = DEFAULT_ADMIN_ROLE;
         cascadingAccessRoles[1] = GUARDIAN;
@@ -304,7 +428,10 @@ contract ReaperSwapper is
      * @dev Returns {true} if {_account} has been granted {_role}. Subclasses should override
      *      this to specify their unique role-checking criteria.
      */
-    function _hasRole(bytes32 _role, address _account) internal view override returns (bool) {
+    function _hasRole(
+        bytes32 _role,
+        address _account
+    ) internal view override returns (bool) {
         return hasRole(_role, _account);
     }
 
@@ -315,25 +442,35 @@ contract ReaperSwapper is
      * - asset's aggregator is considered broken (doesn't have valid historical response)
      * - asset's aggregator is considered frozen (last response exceeds asset's allowed timeout)
      */
-    function getChainlinkPriceTargetDigits(address _token) public view returns (uint256 price) {
-        ChainlinkResponse memory chainlinkResponse = _getCurrentChainlinkResponse(_token);
-        ChainlinkResponse memory prevChainlinkResponse =
-            _getPrevChainlinkResponse(_token, chainlinkResponse.roundId, chainlinkResponse.decimals);
+    function getChainlinkPriceTargetDigits(
+        address _token
+    ) public view returns (uint256 price) {
+        ChainlinkResponse
+            memory chainlinkResponse = _getCurrentChainlinkResponse(_token);
+        ChainlinkResponse
+            memory prevChainlinkResponse = _getPrevChainlinkResponse(
+                _token,
+                chainlinkResponse.roundId,
+                chainlinkResponse.decimals
+            );
         require(
-            !_chainlinkIsBroken(chainlinkResponse, prevChainlinkResponse)
-                && !_chainlinkIsFrozen(chainlinkResponse, _token),
+            !_chainlinkIsBroken(chainlinkResponse, prevChainlinkResponse) &&
+                !_chainlinkIsFrozen(chainlinkResponse, _token),
             "ReaperSwapper: Chainlink must be working and current"
         );
-        price = _scaleChainlinkPriceByDigits(uint256(chainlinkResponse.answer), chainlinkResponse.decimals);
+        price = _scaleChainlinkPriceByDigits(
+            uint256(chainlinkResponse.answer),
+            chainlinkResponse.decimals
+        );
     }
 
-    function _getCurrentChainlinkResponse(address _token)
-        internal
-        view
-        returns (ChainlinkResponse memory chainlinkResponse)
-    {
+    function _getCurrentChainlinkResponse(
+        address _token
+    ) internal view returns (ChainlinkResponse memory chainlinkResponse) {
         // First, try to get current decimal precision:
-        try aggregatorData[_token].aggregator.decimals() returns (uint8 decimals) {
+        try aggregatorData[_token].aggregator.decimals() returns (
+            uint8 decimals
+        ) {
             // If call to Chainlink succeeds, record the current decimal precision
             chainlinkResponse.decimals = decimals;
         } catch {
@@ -343,7 +480,11 @@ contract ReaperSwapper is
 
         // Secondly, try to get latest price data:
         try aggregatorData[_token].aggregator.latestRoundData() returns (
-            uint80 roundId, int256 answer, uint256, /* startedAt */ uint256 timestamp, uint80 /* answeredInRound */
+            uint80 roundId,
+            int256 answer,
+            uint256,
+            /* startedAt */ uint256 timestamp,
+            uint80 /* answeredInRound */
         ) {
             // If call to Chainlink succeeds, return the response and success = true
             chainlinkResponse.roundId = roundId;
@@ -357,19 +498,25 @@ contract ReaperSwapper is
         }
     }
 
-    function _getPrevChainlinkResponse(address _token, uint80 _currentRoundId, uint8 _currentDecimals)
-        internal
-        view
-        returns (ChainlinkResponse memory prevChainlinkResponse)
-    {
+    function _getPrevChainlinkResponse(
+        address _token,
+        uint80 _currentRoundId,
+        uint8 _currentDecimals
+    ) internal view returns (ChainlinkResponse memory prevChainlinkResponse) {
         /*
-        * NOTE: Chainlink only offers a current decimals() value - there is no way to obtain the decimal precision used in a 
-        * previous round.  We assume the decimals used in the previous round are the same as the current round.
-        */
+         * NOTE: Chainlink only offers a current decimals() value - there is no way to obtain the decimal precision used in a
+         * previous round.  We assume the decimals used in the previous round are the same as the current round.
+         */
 
         // Try to get the price data from the previous round:
-        try aggregatorData[_token].aggregator.getRoundData(_currentRoundId - 1) returns (
-            uint80 roundId, int256 answer, uint256, /* startedAt */ uint256 timestamp, uint80 /* answeredInRound */
+        try
+            aggregatorData[_token].aggregator.getRoundData(_currentRoundId - 1)
+        returns (
+            uint80 roundId,
+            int256 answer,
+            uint256,
+            /* startedAt */ uint256 timestamp,
+            uint80 /* answeredInRound */
         ) {
             // If call to Chainlink succeeds, return the response and success = true
             prevChainlinkResponse.roundId = roundId;
@@ -385,40 +532,50 @@ contract ReaperSwapper is
     }
 
     /* Chainlink is considered broken if its current or previous round data is in any way bad. We check the previous round
-    * for two reasons:
-    *
-    * 1) It is necessary data for the price deviation check in case 1,
-    * and
-    * 2) Chainlink is the PriceFeed's preferred primary oracle - having two consecutive valid round responses adds
-    * peace of mind when using or returning to Chainlink.
-    */
-    function _chainlinkIsBroken(ChainlinkResponse memory _currentResponse, ChainlinkResponse memory _prevResponse)
-        internal
-        view
-        returns (bool)
-    {
-        return _badChainlinkResponse(_currentResponse) || _badChainlinkResponse(_prevResponse);
+     * for two reasons:
+     *
+     * 1) It is necessary data for the price deviation check in case 1,
+     * and
+     * 2) Chainlink is the PriceFeed's preferred primary oracle - having two consecutive valid round responses adds
+     * peace of mind when using or returning to Chainlink.
+     */
+    function _chainlinkIsBroken(
+        ChainlinkResponse memory _currentResponse,
+        ChainlinkResponse memory _prevResponse
+    ) internal view returns (bool) {
+        return
+            _badChainlinkResponse(_currentResponse) ||
+            _badChainlinkResponse(_prevResponse);
     }
 
-    function _badChainlinkResponse(ChainlinkResponse memory _response) internal view returns (bool) {
+    function _badChainlinkResponse(
+        ChainlinkResponse memory _response
+    ) internal view returns (bool) {
         // Check for response call reverted
         if (!_response.success) return true;
         // Check for an invalid roundId that is 0
         if (_response.roundId == 0) return true;
         // Check for an invalid timeStamp that is 0, or in the future
-        if (_response.timestamp == 0 || _response.timestamp > block.timestamp) return true;
+        if (_response.timestamp == 0 || _response.timestamp > block.timestamp)
+            return true;
         // Check for non-positive price
         if (_response.answer <= 0) return true;
 
         return false;
     }
 
-    function _chainlinkIsFrozen(ChainlinkResponse memory _response, address _token) internal view returns (bool) {
+    function _chainlinkIsFrozen(
+        ChainlinkResponse memory _response,
+        address _token
+    ) internal view returns (bool) {
         uint256 aggregatorTimeout = aggregatorData[_token].timeout;
         return block.timestamp - _response.timestamp > aggregatorTimeout;
     }
 
-    function _scaleChainlinkPriceByDigits(uint256 _price, uint256 _answerDigits) internal pure returns (uint256) {
+    function _scaleChainlinkPriceByDigits(
+        uint256 _price,
+        uint256 _answerDigits
+    ) internal pure returns (uint256) {
         // Convert the price returned by the Chainlink oracle to an 18-digit decimal
         uint256 price;
         if (_answerDigits >= TARGET_DIGITS) {
@@ -461,19 +618,26 @@ contract ReaperSwapper is
     function _authorizeUpgrade(address) internal override {
         _atLeastRole(DEFAULT_ADMIN_ROLE);
         require(
-            upgradeProposalTime + UPGRADE_TIMELOCK < block.timestamp, "Upgrade cooldown not initiated or still ongoing"
+            upgradeProposalTime + UPGRADE_TIMELOCK < block.timestamp,
+            "Upgrade cooldown not initiated or still ongoing"
         );
         clearUpgradeCooldown();
     }
 
     modifier pullFromBefore(address _from, uint256 _amount) {
-        IERC20MetadataUpgradeable(_from).safeTransferFrom(msg.sender, address(this), _amount);
+        IERC20MetadataUpgradeable(_from).safeTransferFrom(
+            msg.sender,
+            address(this),
+            _amount
+        );
         _;
     }
 
     modifier pushFromAndToAfter(address _from, address _to) {
         _;
-        uint256 fromBal = IERC20MetadataUpgradeable(_from).balanceOf(address(this));
+        uint256 fromBal = IERC20MetadataUpgradeable(_from).balanceOf(
+            address(this)
+        );
         if (fromBal != 0) {
             IERC20MetadataUpgradeable(_from).safeTransfer(msg.sender, fromBal);
         }
