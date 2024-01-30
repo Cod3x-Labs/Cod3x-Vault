@@ -13,6 +13,13 @@ import "oz-upgradeable/proxy/utils/Initializable.sol";
 import "oz-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "oz-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
+enum ExchangeType {
+    UniV2,
+    Bal,
+    ThenaRam,
+    UniV3
+}
+
 abstract contract ReaperBaseStrategyv4 is
     ReaperAccessControl,
     IStrategy,
@@ -53,12 +60,6 @@ abstract contract ReaperBaseStrategyv4 is
     bytes32 public constant GUARDIAN = keccak256("GUARDIAN");
     bytes32 public constant ADMIN = keccak256("ADMIN");
 
-    enum ExchangeType {
-        UniV2,
-        Bal,
-        VeloSolid,
-        UniV3
-    }
 
     struct SwapStep {
         ExchangeType exType;
@@ -305,7 +306,7 @@ abstract contract ReaperBaseStrategyv4 is
         } else if (_step.exType == ExchangeType.Bal) {
             bytes32 poolID = swapper.balSwapPoolIDs(_step.start, _step.end, _step.exchangeAddress);
             require(poolID != bytes32(0), "Pool ID for step not registered in swapper");
-        } else if (_step.exType == ExchangeType.VeloSolid) {
+        } else if (_step.exType == ExchangeType.ThenaRam) {
             IThenaRamRouter.route memory pathElement = swapper
                 .thenaRamSwapPaths(
                     _step.start,
@@ -494,7 +495,7 @@ abstract contract ReaperBaseStrategyv4 is
                 swapper.swapUniV2(step.start, step.end, amount, step.minAmountOutData, step.exchangeAddress);
             } else if (step.exType == ExchangeType.Bal) {
                 swapper.swapBal(step.start, step.end, amount, step.minAmountOutData, step.exchangeAddress);
-            } else if (step.exType == ExchangeType.VeloSolid) {
+            } else if (step.exType == ExchangeType.ThenaRam) {
                 swapper.swapThenaRam(
                     step.start,
                     step.end,
