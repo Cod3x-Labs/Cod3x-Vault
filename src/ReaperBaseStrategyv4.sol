@@ -13,13 +13,6 @@ import "oz-upgradeable/proxy/utils/Initializable.sol";
 import "oz-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "oz-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-enum ExchangeType {
-    UniV2,
-    Bal,
-    ThenaRam,
-    UniV3
-}
-
 abstract contract ReaperBaseStrategyv4 is
     ReaperAccessControl,
     IStrategy,
@@ -60,6 +53,12 @@ abstract contract ReaperBaseStrategyv4 is
     bytes32 public constant GUARDIAN = keccak256("GUARDIAN");
     bytes32 public constant ADMIN = keccak256("ADMIN");
 
+    enum ExchangeType {
+        UniV2,
+        Bal,
+        ThenaRam,
+        UniV3
+    }
 
     struct SwapStep {
         ExchangeType exType;
