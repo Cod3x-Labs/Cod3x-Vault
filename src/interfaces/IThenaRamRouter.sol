@@ -11,37 +11,25 @@ interface IThenaRamRouter {
     }
 
     /* Interfaces */
-    function sortTokens(
-        address tokenA,
-        address tokenB
-    ) external pure returns (address token0, address token1);
+    function sortTokens(address tokenA, address tokenB) external pure returns (address token0, address token1);
 
     // calculates the CREATE2 address for a pair without making any external calls
-    function pairFor(
-        address tokenA,
-        address tokenB,
-        bool stable
-    ) external view returns (address pair);
+    function pairFor(address tokenA, address tokenB, bool stable) external view returns (address pair);
 
     // fetches and sorts the reserves for a pair
-    function getReserves(
-        address tokenA,
-        address tokenB,
-        bool stable
-    ) external view returns (uint256 reserveA, uint256 reserveB);
+    function getReserves(address tokenA, address tokenB, bool stable)
+        external
+        view
+        returns (uint256 reserveA, uint256 reserveB);
 
     // performs chained getAmountOut calculations on any number of pairs
-    function getAmountOut(
-        uint256 amountIn,
-        address tokenIn,
-        address tokenOut
-    ) external view returns (uint256 amount, bool stable);
+    function getAmountOut(uint256 amountIn, address tokenIn, address tokenOut)
+        external
+        view
+        returns (uint256 amount, bool stable);
 
     // performs chained getAmountOut calculations on any number of pairs
-    function getAmountsOut(
-        uint256 amountIn,
-        route[] memory routes
-    ) external view returns (uint256[] memory amounts);
+    function getAmountsOut(uint256 amountIn, route[] memory routes) external view returns (uint256[] memory amounts);
 
     function quoteAddLiquidity(
         address tokenA,
@@ -49,17 +37,12 @@ interface IThenaRamRouter {
         bool stable,
         uint256 amountADesired,
         uint256 amountBDesired
-    )
+    ) external view returns (uint256 amountA, uint256 amountB, uint256 liquidity);
+
+    function quoteRemoveLiquidity(address tokenA, address tokenB, bool stable, uint256 liquidity)
         external
         view
-        returns (uint256 amountA, uint256 amountB, uint256 liquidity);
-
-    function quoteRemoveLiquidity(
-        address tokenA,
-        address tokenB,
-        bool stable,
-        uint256 liquidity
-    ) external view returns (uint256 amountA, uint256 amountB);
+        returns (uint256 amountA, uint256 amountB);
 
     function addLiquidity(
         address tokenA,
@@ -81,10 +64,7 @@ interface IThenaRamRouter {
         uint256 amountETHMin,
         address to,
         uint256 deadline
-    )
-        external
-        payable
-        returns (uint256 amountToken, uint256 amountETH, uint256 liquidity);
+    ) external payable returns (uint256 amountToken, uint256 amountETH, uint256 liquidity);
 
     function removeLiquidity(
         address tokenA,
@@ -154,12 +134,10 @@ interface IThenaRamRouter {
         uint256 deadline
     ) external returns (uint256[] memory amounts);
 
-    function swapExactETHForTokens(
-        uint256 amountOutMin,
-        route[] calldata routes,
-        address to,
-        uint256 deadline
-    ) external payable returns (uint256[] memory amounts);
+    function swapExactETHForTokens(uint256 amountOutMin, route[] calldata routes, address to, uint256 deadline)
+        external
+        payable
+        returns (uint256[] memory amounts);
 
     function swapExactTokensForETH(
         uint256 amountIn,
@@ -179,48 +157,48 @@ interface IThenaRamRouter {
     function removeLiquidityETHSupportingFeeOnTransferTokens(
         address token,
         bool stable,
-        uint liquidity,
-        uint amountTokenMin,
-        uint amountETHMin,
+        uint256 liquidity,
+        uint256 amountTokenMin,
+        uint256 amountETHMin,
         address to,
-        uint deadline
-    ) external returns (uint amountToken, uint amountETH);
+        uint256 deadline
+    ) external returns (uint256 amountToken, uint256 amountETH);
 
     function removeLiquidityETHWithPermitSupportingFeeOnTransferTokens(
         address token,
         bool stable,
-        uint liquidity,
-        uint amountTokenMin,
-        uint amountETHMin,
+        uint256 liquidity,
+        uint256 amountTokenMin,
+        uint256 amountETHMin,
         address to,
-        uint deadline,
+        uint256 deadline,
         bool approveMax,
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external returns (uint amountToken, uint amountETH);
+    ) external returns (uint256 amountToken, uint256 amountETH);
 
     function swapExactTokensForTokensSupportingFeeOnTransferTokens(
-        uint amountIn,
-        uint amountOutMin,
+        uint256 amountIn,
+        uint256 amountOutMin,
         route[] calldata routes,
         address to,
-        uint deadline
+        uint256 deadline
     ) external;
 
     function swapExactETHForTokensSupportingFeeOnTransferTokens(
-        uint amountOutMin,
+        uint256 amountOutMin,
         route[] calldata routes,
         address to,
-        uint deadline
+        uint256 deadline
     ) external payable;
 
     function swapExactTokensForETHSupportingFeeOnTransferTokens(
-        uint amountIn,
-        uint amountOutMin,
+        uint256 amountIn,
+        uint256 amountOutMin,
         route[] calldata routes,
         address to,
-        uint deadline
+        uint256 deadline
     ) external;
 
     // Returns current factory address

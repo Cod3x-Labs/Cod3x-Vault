@@ -60,7 +60,7 @@ abstract contract BalMixin is ISwapErrors {
         }
 
         // Based on configurable param catch fails or just revert
-        if(_tryCatchActive != false){
+        if (_tryCatchActive != false) {
             try IBeetVault(_vault).swap(singleSwap, funds, _minAmountOut, _deadline) returns (uint256 tmpAmountOut) {
                 amountOut = tmpAmountOut;
             } catch {
@@ -70,11 +70,9 @@ abstract contract BalMixin is ISwapErrors {
                 }
                 emit SwapFailed(_vault, _amount, _minAmountOut, _from, _to);
             }
-        }
-        else{
+        } else {
             amountOut = IBeetVault(_vault).swap(singleSwap, funds, _minAmountOut, _deadline);
         }
-
     }
 
     /// @dev Update {SwapPoolId} for a specified pair of tokens and specified vault.

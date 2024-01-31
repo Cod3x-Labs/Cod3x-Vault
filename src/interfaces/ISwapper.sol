@@ -10,12 +10,9 @@ interface ISwapper is ISwapperSwaps {
 
     function balSwapPoolIDs(address _from, address _to, address _vault) external returns (bytes32);
 
-    function thenaRamSwapPaths(
-        address _from,
-        address _to,
-        address _router,
-        uint256 _index
-    ) external returns (IThenaRamRouter.route memory route);
+    function thenaRamSwapPaths(address _from, address _to, address _router, uint256 _index)
+        external
+        returns (IThenaRamRouter.route memory route);
 
     function uniV3SwapPaths(address _from, address _to, address _router) external view returns (UniV3SwapData memory);
 

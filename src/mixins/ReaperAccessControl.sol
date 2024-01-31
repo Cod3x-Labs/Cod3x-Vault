@@ -27,10 +27,7 @@ abstract contract ReaperAccessControl {
         // {_role} must be found in the {cascadingAccessRoles} array.
         // Also, msg.sender's highest role index <= specified role index.
         for (uint256 i = 0; i < numRoles; i = i.uncheckedInc()) {
-            if (
-                !senderHighestRoleFound &&
-                _hasRole(cascadingAccessRoles[i], msg.sender)
-            ) {
+            if (!senderHighestRoleFound && _hasRole(cascadingAccessRoles[i], msg.sender)) {
                 senderHighestRoleFound = true;
             }
             if (_role == cascadingAccessRoles[i]) {
@@ -39,10 +36,7 @@ abstract contract ReaperAccessControl {
             }
         }
 
-        require(
-            specifiedRoleFound && senderHighestRoleFound,
-            "Unauthorized access"
-        );
+        require(specifiedRoleFound && senderHighestRoleFound, "Unauthorized access");
     }
 
     /**
@@ -50,18 +44,11 @@ abstract contract ReaperAccessControl {
      *      Subclasses should override this to specify their unique roles arranged in the correct
      *      order, for example, [SUPER-ADMIN, ADMIN, GUARDIAN, STRATEGIST].
      */
-    function _cascadingAccessRoles()
-        internal
-        view
-        virtual
-        returns (bytes32[] memory);
+    function _cascadingAccessRoles() internal view virtual returns (bytes32[] memory);
 
     /**
      * @dev Returns {true} if {_account} has been granted {_role}. Subclasses should override
      *      this to specify their unique role-checking criteria.
      */
-    function _hasRole(
-        bytes32 _role,
-        address _account
-    ) internal view virtual returns (bool);
+    function _hasRole(bytes32 _role, address _account) internal view virtual returns (bool);
 }

@@ -13,16 +13,12 @@ abstract contract ThenaRamMixin is ISwapErrors {
     using SafeERC20 for IERC20;
 
     event ThenaRamSwapPathUpdated(
-        address indexed from,
-        address indexed to,
-        address indexed router,
-        IThenaRamRouter.route[] path
+        address indexed from, address indexed to, address indexed router, IThenaRamRouter.route[] path
     );
 
     /// @dev tokenA => (tokenB => (router => path): returns best path to swap
     ///         tokenA to tokenB for the given router (protocol)
-    mapping(address => mapping(address => mapping(address => IThenaRamRouter.route[])))
-        public thenaRamSwapPaths;
+    mapping(address => mapping(address => mapping(address => IThenaRamRouter.route[]))) public thenaRamSwapPaths;
 
     /// @dev Helper function to swap {_from} to {_to} given an {_amount}.
     function _swapThenaRam(
@@ -37,16 +33,12 @@ abstract contract ThenaRamMixin is ISwapErrors {
         if (_from == _to || _amount == 0) {
             return 0;
         }
-        IThenaRamRouter.route[] storage path = thenaRamSwapPaths[_from][_to][
-            _router
-        ];
+        IThenaRamRouter.route[] storage path = thenaRamSwapPaths[_from][_to][_router];
         require(path.length != 0, "Missing path for swap");
 
         uint256 predictedOutput;
         IThenaRamRouter router = IThenaRamRouter(_router);
-        try router.getAmountsOut(_amount, path) returns (
-            uint256[] memory amounts
-        ) {
+        try router.getAmountsOut(_amount, path) returns (uint256[] memory amounts) {
             predictedOutput = amounts[amounts.length - 1];
         } catch {}
         if (predictedOutput == 0) {
@@ -58,15 +50,9 @@ abstract contract ThenaRamMixin is ISwapErrors {
         IERC20(_from).safeIncreaseAllowance(_router, _amount);
         // Based on configurable param catch fails or just revert
         if (_tryCatchActive != false) {
-            try
-                router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
-                    _amount,
-                    _minAmountOut,
-                    path,
-                    address(this),
-                    _deadline
-                )
-            {
+            try router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+                _amount, _minAmountOut, path, address(this), _deadline
+            ) {
                 amountOut = IERC20(_to).balanceOf(address(this)) - toBalBefore;
             } catch {
                 IERC20(_from).safeApprove(_router, 0);
@@ -74,11 +60,7 @@ abstract contract ThenaRamMixin is ISwapErrors {
             }
         } else {
             router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
-                _amount,
-                _minAmountOut,
-                path,
-                address(this),
-                _deadline
+                _amount, _minAmountOut, path, address(this), _deadline
             );
             amountOut = IERC20(_to).balanceOf(address(this)) - toBalBefore;
         }
@@ -93,25 +75,17 @@ abstract contract ThenaRamMixin is ISwapErrors {
     ) internal view returns (uint256 swapAmount) {
         uint256 halfInvestment = investmentA / 2;
         uint256 numerator = pair.getAmountOut(halfInvestment, tokenA);
-        uint256 denominator = _quoteLiquidity(
-            halfInvestment,
-            reserveA + halfInvestment,
-            reserveB - numerator
-        );
-        swapAmount =
-            investmentA -
-            Babylonian.sqrt(
-                (halfInvestment * halfInvestment * numerator) / denominator
-            );
+        uint256 denominator = _quoteLiquidity(halfInvestment, reserveA + halfInvestment, reserveB - numerator);
+        swapAmount = investmentA - Babylonian.sqrt((halfInvestment * halfInvestment * numerator) / denominator);
     }
 
     // Copied from Thena/Ramses's Router since it's an internal function in there
     // given some amount of an asset and pair reserves, returns an equivalent amount of the other asset
-    function _quoteLiquidity(
-        uint256 amountA,
-        uint256 reserveA,
-        uint256 reserveB
-    ) internal pure returns (uint256 amountB) {
+    function _quoteLiquidity(uint256 amountA, uint256 reserveA, uint256 reserveB)
+        internal
+        pure
+        returns (uint256 amountB)
+    {
         require(amountA > 0, "Router: INSUFFICIENT_AMOUNT");
         require(reserveA > 0 && reserveB > 0, "Router: INSUFFICIENT_LIQUIDITY");
         amountB = (amountA * reserveB) / reserveA;
@@ -125,23 +99,15 @@ abstract contract ThenaRamMixin is ISwapErrors {
         IThenaRamRouter.route[] memory _path
     ) internal {
         require(
-            _tokenIn != _tokenOut &&
-                _path.length != 0 &&
-                _path[0].from == _tokenIn &&
-                _path[_path.length - 1].to == _tokenOut
+            _tokenIn != _tokenOut && _path.length != 0 && _path[0].from == _tokenIn
+                && _path[_path.length - 1].to == _tokenOut
         );
         delete thenaRamSwapPaths[_tokenIn][_tokenOut][_router];
         for (uint256 i = 0; i < _path.length; i++) {
             if (i < _path.length - 1) {
                 require(_path[i].to == _path[i + 1].from);
-                IThenaRamFactory factory = IThenaRamFactory(
-                    IThenaRamRouter(_router).factory()
-                );
-                address pair = factory.getPair(
-                    _path[i].from,
-                    _path[i].to,
-                    _path[i].stable
-                );
+                IThenaRamFactory factory = IThenaRamFactory(IThenaRamRouter(_router).factory());
+                address pair = factory.getPair(_path[i].from, _path[i].to, _path[i].stable);
                 bool isPair = factory.isPair(pair);
                 require(isPair);
             }
