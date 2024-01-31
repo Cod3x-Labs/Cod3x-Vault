@@ -316,12 +316,7 @@ contract ReaperSwapper is
 
         // Secondly, try to get latest price data:
         try aggregatorData[_token].aggregator.latestRoundData() returns (
-            uint80 roundId,
-            int256 answer,
-            uint256,
-            /* startedAt */
-            uint256 timestamp,
-            uint80 /* answeredInRound */
+            uint80 roundId, int256 answer, uint256, /* startedAt */ uint256 timestamp, uint80 /* answeredInRound */
         ) {
             // If call to Chainlink succeeds, return the response and success = true
             chainlinkResponse.roundId = roundId;
@@ -341,18 +336,13 @@ contract ReaperSwapper is
         returns (ChainlinkResponse memory prevChainlinkResponse)
     {
         /*
-         * NOTE: Chainlink only offers a current decimals() value - there is no way to obtain the decimal precision used in a
-         * previous round.  We assume the decimals used in the previous round are the same as the current round.
-         */
+        * NOTE: Chainlink only offers a current decimals() value - there is no way to obtain the decimal precision used in a 
+        * previous round.  We assume the decimals used in the previous round are the same as the current round.
+        */
 
         // Try to get the price data from the previous round:
         try aggregatorData[_token].aggregator.getRoundData(_currentRoundId - 1) returns (
-            uint80 roundId,
-            int256 answer,
-            uint256,
-            /* startedAt */
-            uint256 timestamp,
-            uint80 /* answeredInRound */
+            uint80 roundId, int256 answer, uint256, /* startedAt */ uint256 timestamp, uint80 /* answeredInRound */
         ) {
             // If call to Chainlink succeeds, return the response and success = true
             prevChainlinkResponse.roundId = roundId;
@@ -368,13 +358,13 @@ contract ReaperSwapper is
     }
 
     /* Chainlink is considered broken if its current or previous round data is in any way bad. We check the previous round
-     * for two reasons:
-     *
-     * 1) It is necessary data for the price deviation check in case 1,
-     * and
-     * 2) Chainlink is the PriceFeed's preferred primary oracle - having two consecutive valid round responses adds
-     * peace of mind when using or returning to Chainlink.
-     */
+    * for two reasons:
+    *
+    * 1) It is necessary data for the price deviation check in case 1,
+    * and
+    * 2) Chainlink is the PriceFeed's preferred primary oracle - having two consecutive valid round responses adds
+    * peace of mind when using or returning to Chainlink.
+    */
     function _chainlinkIsBroken(ChainlinkResponse memory _currentResponse, ChainlinkResponse memory _prevResponse)
         internal
         view
@@ -389,9 +379,7 @@ contract ReaperSwapper is
         // Check for an invalid roundId that is 0
         if (_response.roundId == 0) return true;
         // Check for an invalid timeStamp that is 0, or in the future
-        if (_response.timestamp == 0 || _response.timestamp > block.timestamp) {
-            return true;
-        }
+        if (_response.timestamp == 0 || _response.timestamp > block.timestamp) return true;
         // Check for non-positive price
         if (_response.answer <= 0) return true;
 
