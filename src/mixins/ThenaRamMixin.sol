@@ -67,7 +67,7 @@ abstract contract ThenaRamMixin is ISwapErrors {
     }
 
     function _getSwapAmountThenaRam(
-        IVeloPair pair,
+        IThenaRamPair pair,
         uint256 investmentA,
         uint256 reserveA,
         uint256 reserveB,
