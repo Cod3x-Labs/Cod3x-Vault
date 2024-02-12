@@ -6,3 +6,5 @@ Whenever spinning up a new strategy repo, vault code is often required. Instead 
 - Work in a feature branch on your local machine and make PRs to master.
 - DO NOT IGNORE formatting errors!
 - Once your PR is merged, navigate to the project that's consuming this repository, and update the submodule dependencies (following the workflow required for that specific project).
+
+![Architecture diagram](docs/architecture.png)
