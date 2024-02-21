@@ -39,7 +39,10 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
 
     uint256 public constant DEGRADATION_COEFFICIENT = 10 ** 18; // The unit for calculating profit degradation.
     uint256 public constant PERCENT_DIVISOR = 10000;
+    uint256 public constant SECONDS_PER_YEAR = 31_556_952;
+
     uint256 public tvlCap;
+    uint16 public managementFeeBPS; //Vault management fee, in BPS
 
     uint256 public totalIdle; // Amount of tokens in the vault
     uint256 public totalAllocBPS; // Sum of allocBPS across all strategies (in BPS, <= 10k)
@@ -78,6 +81,7 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
 
     event StrategyAdded(address indexed strategy, uint256 feeBPS, uint256 allocBPS);
     event StrategyFeeBPSUpdated(address indexed strategy, uint256 feeBPS);
+    event ManagementFeeBPSUpdated(uint256 feeBPS);
     event StrategyAllocBPSUpdated(address indexed strategy, uint256 allocBPS);
     event StrategyRevoked(address indexed strategy);
     event UpdateWithdrawalQueue(address[] withdrawalQueue);
@@ -112,6 +116,7 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
         string memory _name,
         string memory _symbol,
         uint256 _tvlCap,
+        uint16 _managementFeeBPS,
         address _treasury,
         address[] memory _strategists,
         address[] memory _multisigRoles
@@ -121,6 +126,8 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
         lastReport = block.timestamp;
         tvlCap = _tvlCap;
         treasury = _treasury;
+        _validateManagementFeeValue(_managementFeeBPS);
+        managementFeeBPS = _managementFeeBPS;
         lockedProfitDegradation = (DEGRADATION_COEFFICIENT * 46) / 10 ** 6; // 6 hours in blocks
 
         uint256 numStrategists = _strategists.length;
@@ -451,20 +458,35 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
     }
 
     /**
-     * @notice Helper function to charge fees from the gain reported by a strategy.
+     * @notice Helper function to charge performance and management fees.
      * Fees is charged by issuing the corresponding amount of vault shares to the treasury.
      * @param strategy The strategy that reported gain.
-     * @param gain The amount of profit reported.
+     * @param gain The amount of profit reported. Can be 0
      * @return The fee amount in assets.
      */
     function _chargeFees(address strategy, uint256 gain) internal returns (uint256) {
         uint256 performanceFee = (gain * strategies[strategy].feeBPS) / PERCENT_DIVISOR;
+
+        uint256 duration = block.timestamp - strategies[strategy].lastReport;
+
+        uint256 managementFee =
+            (strategies[strategy].allocated * duration * managementFeeBPS) / PERCENT_DIVISOR / SECONDS_PER_YEAR;
+
+        uint256 totalFeeShares = 0;
+
+        uint256 supply = totalSupply();
         if (performanceFee != 0) {
-            uint256 supply = totalSupply();
-            uint256 shares = supply == 0 ? performanceFee : (performanceFee * supply) / _freeFunds();
-            _mint(treasury, shares);
+            uint256 performanceFeeShares = supply == 0 ? performanceFee : (performanceFee * supply) / _freeFunds();
+            totalFeeShares += performanceFeeShares;
         }
-        return performanceFee;
+        if (managementFee != 0) {
+            uint256 managementFeeShares = supply == 0 ? managementFee : (managementFee * supply) / _freeFunds();
+            totalFeeShares += managementFeeShares;
+        }
+
+        _mint(treasury, totalFeeShares);
+
+        return totalFeeShares;
     }
 
     // To avoid "stack too deep" errors
@@ -499,9 +521,10 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
             _reportLoss(vars.stratAddr, vars.loss);
         } else if (_roi > 0) {
             vars.gain = uint256(_roi);
-            vars.fees = _chargeFees(vars.stratAddr, vars.gain);
             strategy.gains += vars.gain;
         }
+
+        vars.fees = _chargeFees(vars.stratAddr, vars.gain);
 
         vars.available = availableCapital();
         if (vars.available < 0) {
@@ -631,6 +654,16 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
     }
 
     /**
+     * @notice Function for updating the Vault Management fee(in BPS).
+     */
+    function updateManagementFeeBPS(uint16 _feeBPS) external {
+        _atLeastRole(ADMIN);
+        _validateManagementFeeValue(_feeBPS);
+        managementFeeBPS = _feeBPS;
+        emit ManagementFeeBPSUpdated(_feeBPS);
+    }
+
+    /**
      * @dev Rescues random funds stuck that the strat can't handle.
      * @param _token address of the token to rescue.
      */
@@ -675,5 +708,9 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
      */
     function _hasRole(bytes32 _role, address _account) internal view override returns (bool) {
         return hasRole(_role, _account);
+    }
+
+    function _validateManagementFeeValue(uint16 _feeBPS) internal pure {
+        require(_feeBPS <= PERCENT_DIVISOR / 50, "Management fee cannot be higher than 200 BPS(2%)");
     }
 }
