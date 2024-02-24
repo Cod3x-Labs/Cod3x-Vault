@@ -6,6 +6,10 @@ import {VaultBaseTest} from "./VaultBase.t.sol";
 import {StrategyMock} from "../mock/StrategyMock.sol";
 
 contract VaultStrategyTest is VaultBaseTest {
+    /*//////////////////////////////////////////////////////////////////////////
+                                   ADD_STRATEGY() TESTS
+    //////////////////////////////////////////////////////////////////////////*/
+
     function testGivenNonDefaultAdminRoleWhenAddStrategyThenReverts() public {
         address[] memory nonDefaultAdminRoles = new address[](4);
         nonDefaultAdminRoles[0] = ADMIN.addr;
@@ -22,10 +26,6 @@ contract VaultStrategyTest is VaultBaseTest {
             vm.stopPrank();
         }
     }
-
-    /*//////////////////////////////////////////////////////////////////////////
-                                   ADD_STRATEGY() TESTS
-    //////////////////////////////////////////////////////////////////////////*/
 
     function testGivenEmergencyShutdwnWhenAddStrategyThenReverts() public {
         vm.startPrank(DEFAULT_ADMIN.addr);
@@ -153,13 +153,13 @@ contract VaultStrategyTest is VaultBaseTest {
     //////////////////////////////////////////////////////////////////////////*/
 
     function testGivenNonAdminRoleWhenUpdateStrategyFeeThenReverts() public {
-        address[] memory nonDefaultAdminRoles = new address[](3);
-        nonDefaultAdminRoles[0] = GUARDIAN.addr;
-        nonDefaultAdminRoles[1] = STRATEGIST.addr;
-        nonDefaultAdminRoles[2] = makeAddr("RANDOM_ADDR");
+        address[] memory nonAdminRoles = new address[](3);
+        nonAdminRoles[0] = GUARDIAN.addr;
+        nonAdminRoles[1] = STRATEGIST.addr;
+        nonAdminRoles[2] = makeAddr("RANDOM_ADDR");
 
-        for (uint8 i = 0; i < nonDefaultAdminRoles.length; i++) {
-            vm.startPrank(nonDefaultAdminRoles[i]);
+        for (uint8 i = 0; i < nonAdminRoles.length; i++) {
+            vm.startPrank(nonAdminRoles[i]);
             vm.expectRevert("Unauthorized access");
 
             sut.updateStrategyFeeBPS(address(strategyMock), 0);
@@ -207,5 +207,78 @@ contract VaultStrategyTest is VaultBaseTest {
         emit VaultBaseTest.StrategyFeeBPSUpdated(address(strategyMock), updatedFee);
 
         sut.updateStrategyFeeBPS(address(strategyMock), updatedFee);
+    }
+
+    /*//////////////////////////////////////////////////////////////////////////
+                                   UPDATE_STRATEGY_ALLOC_BPS() TESTS
+    //////////////////////////////////////////////////////////////////////////*/
+
+    function testGivenNonActivatedStrategyWhenUpdateStrategyAllocationThenReverts() public {
+        address nonActivatedStrategy = makeAddr("STR");
+
+        vm.expectRevert("Invalid strategy address");
+
+        sut.updateStrategyAllocBPS(nonActivatedStrategy, 0);
+    }
+
+    function testGivenNonAuthorizedRoleWhenAllocationIsNotZeroThenReverts() public {
+        vm.startPrank(DEFAULT_ADMIN.addr);
+        sut.addStrategy(address(strategyMock), 1000, 0);
+
+        address nonAuthorizedRole = makeAddr("RANDOM_ADDR");
+
+        vm.startPrank(nonAuthorizedRole);
+        vm.expectRevert("Unauthorized access");
+
+        sut.updateStrategyAllocBPS(address(strategyMock), 0);
+    }
+
+    function testGivenNonAuthorizedRoleWhenAllocationIsZeroThenReverts() public {
+        vm.startPrank(DEFAULT_ADMIN.addr);
+        sut.addStrategy(address(strategyMock), 1000, 0);
+
+        address[] memory nonAdminRoles = new address[](3);
+        nonAdminRoles[0] = GUARDIAN.addr;
+        nonAdminRoles[1] = STRATEGIST.addr;
+        nonAdminRoles[2] = makeAddr("RANDOM_ADDR");
+
+        for (uint8 i = 0; i < nonAdminRoles.length; i++) {
+            vm.startPrank(nonAdminRoles[i]);
+            vm.expectRevert("Unauthorized access");
+
+            sut.updateStrategyAllocBPS(address(strategyMock), 0);
+
+            vm.stopPrank();
+        }
+    }
+
+    function testGivenTotalAllocationAboveCapWhenUpdateStrategyAllocationThenReverts() public {
+        vm.startPrank(DEFAULT_ADMIN.addr);
+        sut.addStrategy(address(strategyMock), 1000, 0);
+
+        vm.startPrank(ADMIN.addr);
+
+        vm.expectRevert("expected error: Invalid BPS value");
+
+        sut.updateStrategyAllocBPS(address(strategyMock), 10_000 + 1);
+    }
+
+    function testGivenCorrectInputWhenUpdateStrategyAllocationThenUpdates(uint256 allocationBelowCap) public {
+        vm.startPrank(DEFAULT_ADMIN.addr);
+        StrategyMock initialStrategyMock = new StrategyMock();
+        initialStrategyMock.setVaultAddress(address(sut));
+        initialStrategyMock.setWantAddress(address(sut.token()));
+        uint256 existingAllocation = 3_000;
+        sut.addStrategy(address(initialStrategyMock), 2_000, existingAllocation);
+        sut.addStrategy(address(strategyMock), 1000, 1_000);
+
+        allocationBelowCap = bound(allocationBelowCap, 0, 10_000 - existingAllocation);
+
+        sut.updateStrategyAllocBPS(address(strategyMock), allocationBelowCap);
+
+        (,, uint256 allocBPS,,,,) = sut.strategies(address(strategyMock));
+
+        assertEq(allocBPS, allocationBelowCap);
+        assertEq(sut.totalAllocBPS(), allocationBelowCap + existingAllocation);
     }
 }
