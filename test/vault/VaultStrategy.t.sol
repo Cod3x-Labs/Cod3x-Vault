@@ -23,6 +23,10 @@ contract VaultStrategyTest is VaultBaseTest {
         }
     }
 
+    /*//////////////////////////////////////////////////////////////////////////
+                                   ADD_STRATEGY() TESTS
+    //////////////////////////////////////////////////////////////////////////*/
+
     function testGivenEmergencyShutdwnWhenAddStrategyThenReverts() public {
         vm.startPrank(DEFAULT_ADMIN.addr);
         sut.setEmergencyShutdown(true);
@@ -142,5 +146,66 @@ contract VaultStrategyTest is VaultBaseTest {
         emit VaultBaseTest.StrategyAdded(address(strategyMock), 2_000, 3_000);
 
         sut.addStrategy(address(strategyMock), 2_000, 3_000);
+    }
+
+    /*//////////////////////////////////////////////////////////////////////////
+                                   UPDATE_STRATEGY_FEE_BPS() TESTS
+    //////////////////////////////////////////////////////////////////////////*/
+
+    function testGivenNonAdminRoleWhenUpdateStrategyFeeThenReverts() public {
+        address[] memory nonDefaultAdminRoles = new address[](3);
+        nonDefaultAdminRoles[0] = GUARDIAN.addr;
+        nonDefaultAdminRoles[1] = STRATEGIST.addr;
+        nonDefaultAdminRoles[2] = makeAddr("RANDOM_ADDR");
+
+        for (uint8 i = 0; i < nonDefaultAdminRoles.length; i++) {
+            vm.startPrank(nonDefaultAdminRoles[i]);
+            vm.expectRevert("Unauthorized access");
+
+            sut.updateStrategyFeeBPS(address(strategyMock), 0);
+
+            vm.stopPrank();
+        }
+    }
+
+    function testGivenNonActivatedStrategyWhenUpdateStrategyFeeThenReverts() public {
+        vm.startPrank(ADMIN.addr);
+        address nonActivatedStrategy = makeAddr("STR");
+
+        vm.expectRevert("Invalid strategy address");
+
+        sut.updateStrategyFeeBPS(nonActivatedStrategy, 0);
+    }
+
+    function testGivenTooHighFeeWhenUpdateStrategyFeeThenReverts() public {
+        vm.startPrank(DEFAULT_ADMIN.addr);
+        sut.addStrategy(address(strategyMock), 0, 0);
+
+        vm.expectRevert("Fee cannot be higher than 20 BPS");
+
+        sut.updateStrategyFeeBPS(address(strategyMock), 2000 + 1);
+    }
+
+    function testGivenFeeWhenUpdateStrategyFeeThenUpdatesFee() public {
+        vm.startPrank(DEFAULT_ADMIN.addr);
+        sut.addStrategy(address(strategyMock), 1000, 0);
+
+        uint256 updatedFeeBPS = 2000;
+        sut.updateStrategyFeeBPS(address(strategyMock), 2000);
+
+        (, uint256 feeBPS,,,,,) = sut.strategies(address(strategyMock));
+
+        assertEq(feeBPS, updatedFeeBPS);
+    }
+
+    function testGivenFeeWhenUpdateStrategyFeeThenEventEmitted() public {
+        vm.startPrank(DEFAULT_ADMIN.addr);
+        sut.addStrategy(address(strategyMock), 1000, 0);
+        uint256 updatedFee = 2_000;
+
+        vm.expectEmit();
+        emit VaultBaseTest.StrategyFeeBPSUpdated(address(strategyMock), updatedFee);
+
+        sut.updateStrategyFeeBPS(address(strategyMock), updatedFee);
     }
 }

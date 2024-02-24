@@ -22,6 +22,7 @@ abstract contract VaultBaseTest is Test {
     Account internal STRATEGIST = makeAccount("STRATEGIST");
 
     event StrategyAdded(address indexed strategy, uint256 feeBPS, uint256 allocBPS);
+    event StrategyFeeBPSUpdated(address indexed strategy, uint256 feeBPS);
 
     function setUp() public {
         assetMock = new ERC20Mock("mockAssetToken", "MAT");
