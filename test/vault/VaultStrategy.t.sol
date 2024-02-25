@@ -84,13 +84,13 @@ contract VaultStrategyTest is VaultBaseTest {
 
         vm.expectRevert("Invalid allocBPS value");
 
-        sut.addStrategy(address(strategyMock), 0, 10_000 + 1);
+        sut.addStrategy(address(strategyMock), 0, ALLOCATION_CAP + 1);
     }
 
     function testGivenNewStrategyWhenAddStrategyThenStrategyIsAdded() public {
         vm.startPrank(DEFAULT_ADMIN.addr);
 
-        sut.addStrategy(address(strategyMock), 2_000, 10_000);
+        sut.addStrategy(address(strategyMock), 2_000, ALLOCATION_CAP);
 
         uint256 startTime = block.timestamp;
 
@@ -110,7 +110,7 @@ contract VaultStrategyTest is VaultBaseTest {
             activation >= startTime && activation <= endTime, "Strategy activation should be within the expected range"
         );
         assertEq(feeBPS, 2_000, "Stratey feeBPS should be set correctly");
-        assertEq(allocBPS, 10_000, "Stratey allocBPS should be set correctly");
+        assertEq(allocBPS, ALLOCATION_CAP, "Stratey allocBPS should be set correctly");
         assertEq(allocated, 0, "Stratey allocated should be zero");
         assertEq(gains, 0, "Stratey gains should be zero");
         assertEq(losses, 0, "Stratey losses should be zero");
@@ -258,9 +258,9 @@ contract VaultStrategyTest is VaultBaseTest {
 
         vm.startPrank(ADMIN.addr);
 
-        vm.expectRevert("expected error: Invalid BPS value");
+        vm.expectRevert("Invalid BPS value");
 
-        sut.updateStrategyAllocBPS(address(strategyMock), 10_000 + 1);
+        sut.updateStrategyAllocBPS(address(strategyMock), ALLOCATION_CAP + 1);
     }
 
     function testGivenCorrectInputWhenUpdateStrategyAllocationThenUpdates(uint256 allocationBelowCap) public {
@@ -272,7 +272,7 @@ contract VaultStrategyTest is VaultBaseTest {
         sut.addStrategy(address(initialStrategyMock), 2_000, existingAllocation);
         sut.addStrategy(address(strategyMock), 1000, 1_000);
 
-        allocationBelowCap = bound(allocationBelowCap, 0, 10_000 - existingAllocation);
+        allocationBelowCap = bound(allocationBelowCap, 0, ALLOCATION_CAP - existingAllocation);
 
         sut.updateStrategyAllocBPS(address(strategyMock), allocationBelowCap);
 

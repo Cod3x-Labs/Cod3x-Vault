@@ -15,6 +15,7 @@ abstract contract VaultBaseTest is Test {
 
     uint256 internal constant TVL_CAP = 1_000_000 * 1e12;
     uint16 internal constant MANAGEMENT_FEE_BPS = 200;
+    uint256 internal ALLOCATION_CAP;
 
     Account internal DEFAULT_ADMIN = makeAccount("DEFAULT_ADMIN");
     Account internal ADMIN = makeAccount("ADMIN");
@@ -52,6 +53,8 @@ abstract contract VaultBaseTest is Test {
 
         strategyMock.setVaultAddress(address(sut));
         strategyMock.setWantAddress(address(sut.token()));
+
+        ALLOCATION_CAP = sut.PERCENT_DIVISOR();
 
         vm.stopPrank();
     }
