@@ -24,6 +24,7 @@ abstract contract VaultBaseTest is Test {
 
     event StrategyAdded(address indexed strategy, uint256 feeBPS, uint256 allocBPS);
     event StrategyFeeBPSUpdated(address indexed strategy, uint256 feeBPS);
+    event StrategyRevoked(address indexed strategy);
 
     function setUp() public {
         assetMock = new ERC20Mock("mockAssetToken", "MAT");

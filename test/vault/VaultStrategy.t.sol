@@ -281,4 +281,62 @@ contract VaultStrategyTest is VaultBaseTest {
         assertEq(allocBPS, allocationBelowCap);
         assertEq(sut.totalAllocBPS(), allocationBelowCap + existingAllocation);
     }
+
+    /*//////////////////////////////////////////////////////////////////////////
+                                   REVOKE_STRATEGY() TESTS
+    //////////////////////////////////////////////////////////////////////////*/
+
+    function testGivenNonGuardinaRoleWhenRevokeStrategyThenReverts() public {
+        address[] memory nonGuardianRoles = new address[](2);
+        nonGuardianRoles[0] = STRATEGIST.addr;
+        nonGuardianRoles[1] = makeAddr("RANDOM_ADDR");
+
+        for (uint8 i = 0; i < nonGuardianRoles.length; i++) {
+            vm.startPrank(nonGuardianRoles[i]);
+            vm.expectRevert("Unauthorized access");
+
+            sut.updateStrategyFeeBPS(address(strategyMock), 0);
+
+            vm.stopPrank();
+        }
+    }
+
+    function testGivenStrategyAlloctionIsNotZeroWhenRevokeStrategyThenAllocationsUpdated() public {
+        vm.startPrank(DEFAULT_ADMIN.addr);
+        StrategyMock initialStrategyMock = new StrategyMock();
+        initialStrategyMock.setVaultAddress(address(sut));
+        initialStrategyMock.setWantAddress(address(sut.token()));
+        sut.addStrategy(address(initialStrategyMock), 2_000, 3_000);
+        sut.addStrategy(address(strategyMock), 0, 2_000);
+        assertEq(sut.totalAllocBPS(), 5_000);
+
+        sut.revokeStrategy(address(strategyMock));
+
+        assertEq(sut.totalAllocBPS(), 5_000 - 2_000);
+        (,, uint256 allocBPS,,,,) = sut.strategies(address(strategyMock));
+        assertEq(allocBPS, 0);
+    }
+
+    function testGivenStrategyAlloctionIsNotZeroWhenRevokeStrategyThenEventEmitted() public {
+        vm.startPrank(DEFAULT_ADMIN.addr);
+        sut.addStrategy(address(strategyMock), 0, 2_000);
+
+        address[] memory authorizedRoles = new address[](4);
+        authorizedRoles[0] = DEFAULT_ADMIN.addr;
+        authorizedRoles[1] = ADMIN.addr;
+        authorizedRoles[2] = GUARDIAN.addr;
+        authorizedRoles[3] = address(strategyMock);
+
+        for (uint8 i = 0; i < authorizedRoles.length; i++) {
+            vm.startPrank(ADMIN.addr);
+            sut.updateStrategyAllocBPS(address(strategyMock), 1_000);
+
+            vm.startPrank(authorizedRoles[i]);
+
+            vm.expectEmit();
+            emit VaultBaseTest.StrategyRevoked(address(strategyMock));
+
+            sut.revokeStrategy(address(strategyMock));
+        }
+    }
 }
