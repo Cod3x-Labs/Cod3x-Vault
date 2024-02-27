@@ -3,7 +3,6 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
-import {ERC20} from "oz/token/ERC20/ERC20.sol";
 import {ReaperVaultV2} from "../../src/ReaperVaultV2.sol";
 import {ERC20Mock} from "../mock/ERC20Mock.sol";
 import {StrategyMock} from "../mock/StrategyMock.sol";
@@ -11,12 +10,13 @@ import {StrategyMock} from "../mock/StrategyMock.sol";
 abstract contract VaultBaseTest is Test {
     ReaperVaultV2 internal sut;
     StrategyMock internal strategyMock;
-    ERC20 internal assetMock;
+    ERC20Mock internal assetMock;
 
-    uint256 internal constant TVL_CAP = 1_000_000 * 1e12;
+    uint256 internal constant TVL_CAP = 1_000_000 * 1e18;
     uint16 internal constant MANAGEMENT_FEE_BPS = 200;
     uint256 internal ALLOCATION_CAP;
 
+    Account internal TREASURY = makeAccount("TREASURY");
     Account internal DEFAULT_ADMIN = makeAccount("DEFAULT_ADMIN");
     Account internal ADMIN = makeAccount("ADMIN");
     Account internal GUARDIAN = makeAccount("GUARDIAN");
@@ -25,6 +25,17 @@ abstract contract VaultBaseTest is Test {
     event StrategyAdded(address indexed strategy, uint256 feeBPS, uint256 allocBPS);
     event StrategyFeeBPSUpdated(address indexed strategy, uint256 feeBPS);
     event StrategyRevoked(address indexed strategy);
+    event StrategyReported(
+        address indexed strategy,
+        uint256 gain,
+        uint256 loss,
+        uint256 debtPaid,
+        uint256 gains,
+        uint256 losses,
+        uint256 allocated,
+        uint256 allocationAdded,
+        uint256 allocBPS
+    );
 
     function setUp() public {
         assetMock = new ERC20Mock("mockAssetToken", "MAT");
@@ -47,7 +58,7 @@ abstract contract VaultBaseTest is Test {
             "V",
             TVL_CAP,
             MANAGEMENT_FEE_BPS,
-            makeAccount("TREASURY").addr,
+            TREASURY.addr,
             strategists,
             multisigRoles
         );
