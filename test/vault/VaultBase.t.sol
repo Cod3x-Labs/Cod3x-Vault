@@ -52,14 +52,7 @@ abstract contract VaultBaseTest is Test {
         vm.startPrank(DEFAULT_ADMIN.addr);
 
         sut = new ReaperVaultV2(
-            address(assetMock),
-            "Vault",
-            "V",
-            TVL_CAP,
-            MANAGEMENT_FEE_BPS,
-            TREASURY.addr,
-            strategists,
-            multisigRoles
+            address(assetMock), "Vault", "V", TVL_CAP, MANAGEMENT_FEE_BPS, TREASURY.addr, strategists, multisigRoles
         );
 
         strategyMock = new StrategyMock();
