@@ -39,7 +39,7 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
 
     uint256 public constant DEGRADATION_COEFFICIENT = 10 ** 18; // The unit for calculating profit degradation.
     uint256 public constant PERCENT_DIVISOR = 10000;
-    uint256 public constant SECONDS_PER_YEAR = 31_556_952;
+    uint256 public constant SECONDS_PER_YEAR = 365.25 days;
 
     uint256 public tvlCap;
     uint16 public managementFeeBPS; //Vault management fee, in BPS
@@ -553,7 +553,12 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
 
         // Profit is locked and gradually released per block
         // NOTE: compute current locked profit and replace with sum of current and new
-        vars.lockedProfitBeforeLoss = _calculateLockedProfit() + vars.gain - vars.fees;
+        uint256 calculatedLockedProfit = _calculateLockedProfit() + vars.gain;
+        if (calculatedLockedProfit > vars.fees) {
+            vars.lockedProfitBeforeLoss = calculatedLockedProfit - vars.fees;
+        } else {
+            vars.lockedProfitBeforeLoss = 0;
+        }
         if (vars.lockedProfitBeforeLoss > vars.loss) {
             lockedProfit = vars.lockedProfitBeforeLoss - vars.loss;
         } else {
