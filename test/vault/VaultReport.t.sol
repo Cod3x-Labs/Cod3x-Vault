@@ -13,15 +13,6 @@ contract VaultReportTest is VaultBaseTest {
         sut.report(0, 0);
     }
 
-    function testGivenStrategyLossHigherThanAllocationWhenReportThenReverts() public {
-        _addStrategy(0, 0);
-
-        vm.expectRevert("Strategy loss cannot be greater than allocation");
-
-        vm.startPrank(address(strategyMock));
-        sut.report(-2_000, 0);
-    }
-
     function testGivenReportWithZeroROIAndRepaymentWhenStarategyAllocationZeroThenNoFeesMinted() public {
         _addStrategy(2_000, 5_000); //2000 = 20%, 5000 = 50%
 
@@ -73,6 +64,18 @@ contract VaultReportTest is VaultBaseTest {
         sut.report(0, 0);
     }
 
+    /*//////////////////////////////////////////////////////////////////////////
+                                   STRATEGY LOSS
+    //////////////////////////////////////////////////////////////////////////*/
+    function testGivenStrategyLossHigherThanAllocationWhenReportThenReverts() public {
+        _addStrategy(0, 0);
+
+        vm.expectRevert("Strategy loss cannot be greater than allocation");
+
+        vm.startPrank(address(strategyMock));
+        sut.report(-2_000, 0);
+    }
+
     function testGivenStrategyLossWhenVaultTotalAllocationBPSNotZeroThenAllocValuesUpdated() public {
         uint256 stratAllocationBPS = 5_000; //50%
         uint256 vaultDepositBalance = 500_000 * 10 ** sut.decimals();
@@ -80,18 +83,56 @@ contract VaultReportTest is VaultBaseTest {
 
         vm.startPrank(address(strategyMock));
         int256 roi = int256(20_000 * 10 ** sut.decimals());
-        sut.report(-roi, 0);
+        uint256 strategyDebt = sut.report(-roi, 0);
 
-        (,, uint256 allocBPSBefore,,,,) = sut.strategies(address(strategyMock));
-        uint256 expectedBPSChange =
-            Math.min((uint256(roi) * sut.totalAllocBPS()) / sut.totalAllocated(), allocBPSBefore);
+        (,, uint256 allocBPS, uint256 allocated,,,) = sut.strategies(address(strategyMock));
+        uint256 expectedBPSChange = Math.min((uint256(roi) * sut.totalAllocBPS()) / sut.totalAllocated(), allocBPS);
         uint256 expectedStartAllocationBPS = stratAllocationBPS - expectedBPSChange;
         uint256 expectedTotalAllocationBPS = stratAllocationBPS - expectedBPSChange;
-        (,, uint256 allocBPSAfter,,,,) = sut.strategies(address(strategyMock));
-        assertEq(expectedStartAllocationBPS, allocBPSAfter);
+
+        assertEq(expectedStartAllocationBPS, allocBPS);
         assertEq(expectedTotalAllocationBPS, sut.totalAllocBPS());
         assertEq(vaultDepositBalance * stratAllocationBPS / sut.PERCENT_DIVISOR() - uint256(roi), sut.totalAllocated());
+
+        uint256 stratMaxAllocation = allocBPS * sut.balance() / sut.PERCENT_DIVISOR();
+        uint256 expectedDebt = allocated - stratMaxAllocation;
+        assertEq(strategyDebt, expectedDebt);
     }
+
+    function testGivenStrategyLossWithRepaymentWhenVaultTotalAllocationBPSNotZeroThenAllocValuesUpdated() public {
+        uint256 stratAllocationBPS = 5_000; //50%
+        uint256 vaultDepositBalance = 500_000 * 10 ** sut.decimals();
+        _simulateStratInitialAllocation(vaultDepositBalance, 0, stratAllocationBPS);
+
+        vm.startPrank(address(strategyMock));
+        int256 roi = int256(20_000 * 10 ** sut.decimals());
+        uint256 repayment = 5_000 * 10 ** sut.decimals();
+        strategyMock.approveVaultSpender();
+        uint256 strategyDebt = sut.report(-roi, repayment);
+
+        (,, uint256 allocBPS, uint256 allocated,,,) = sut.strategies(address(strategyMock));
+
+        assertEq(
+            vaultDepositBalance * stratAllocationBPS / sut.PERCENT_DIVISOR() - uint256(roi) - repayment,
+            sut.totalAllocated()
+        );
+
+        uint256 expectedStartAllocation =
+            vaultDepositBalance * stratAllocationBPS / sut.PERCENT_DIVISOR() - uint256(roi) - repayment;
+        assertEq(expectedStartAllocation, allocated);
+        assertEq(
+            assetMock.balanceOf(address(strategyMock)),
+            vaultDepositBalance * stratAllocationBPS / sut.PERCENT_DIVISOR() - repayment
+        );
+        assertEq(
+            assetMock.balanceOf(address(sut)),
+            vaultDepositBalance - (vaultDepositBalance * stratAllocationBPS / sut.PERCENT_DIVISOR()) + repayment
+        );
+    }
+
+    /*//////////////////////////////////////////////////////////////////////////
+                                   FEE TESTS
+    //////////////////////////////////////////////////////////////////////////*/
 
     function testGivenStrategyGainWhenReportThenPerformanceFeeApplied() public {
         uint256 stratAllocationBPS = 5_000; //50%
@@ -158,19 +199,5 @@ contract VaultReportTest is VaultBaseTest {
 
         vm.startPrank(address(strategyMock));
         sut.report(0, 0);
-    }
-
-    function _addStrategy(uint256 feeBPS, uint256 allocationBPS) private {
-        vm.startPrank(DEFAULT_ADMIN.addr);
-        sut.addStrategy(address(strategyMock), feeBPS, allocationBPS);
-    }
-
-    function _depositToVault(uint256 amount) private {
-        address depositor = makeAddr("depositor");
-        deal(address(assetMock), depositor, amount);
-
-        vm.startPrank(depositor);
-        assetMock.approve(address(sut), amount);
-        sut.deposit(amount);
     }
 }

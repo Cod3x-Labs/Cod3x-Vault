@@ -64,6 +64,20 @@ abstract contract VaultBaseTest is Test {
         vm.stopPrank();
     }
 
+    function _depositToVault(uint256 amount) internal {
+        address depositor = makeAddr("depositor");
+        deal(address(assetMock), depositor, amount);
+
+        vm.startPrank(depositor);
+        assetMock.approve(address(sut), amount);
+        sut.deposit(amount);
+    }
+
+    function _addStrategy(uint256 feeBPS, uint256 allocationBPS) internal {
+        vm.startPrank(DEFAULT_ADMIN.addr);
+        sut.addStrategy(address(strategyMock), feeBPS, allocationBPS);
+    }
+
     function _timeTravel(uint256 startTime, uint256 daysToWarp) internal {
         uint256 warpToTime = startTime + (daysToWarp * 1 days);
         vm.warp(warpToTime);
