@@ -39,7 +39,6 @@ abstract contract VaultBaseTest is Test {
 
     function setUp() public {
         assetMock = new ERC20Mock("mockAssetToken", "MAT");
-        strategyMock = new StrategyMock();
 
         address[] memory strategists = new address[](1);
         strategists[0] = STRATEGIST.addr;
@@ -63,11 +62,17 @@ abstract contract VaultBaseTest is Test {
             multisigRoles
         );
 
+        strategyMock = new StrategyMock();
         strategyMock.setVaultAddress(address(sut));
         strategyMock.setWantAddress(address(sut.token()));
 
         ALLOCATION_CAP = sut.PERCENT_DIVISOR();
 
         vm.stopPrank();
+    }
+
+    function _timeTravel(uint256 startTime, uint256 daysToWarp) internal {
+        uint256 warpToTime = startTime + (daysToWarp * 1 days);
+        vm.warp(warpToTime);
     }
 }
