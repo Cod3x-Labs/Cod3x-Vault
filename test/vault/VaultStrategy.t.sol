@@ -11,11 +11,12 @@ contract VaultStrategyTest is VaultBaseTest {
     //////////////////////////////////////////////////////////////////////////*/
 
     function testGivenNonDefaultAdminRoleWhenAddStrategyThenReverts() public {
-        address[] memory nonDefaultAdminRoles = new address[](4);
+        address[] memory nonDefaultAdminRoles = new address[](5);
         nonDefaultAdminRoles[0] = ADMIN.addr;
         nonDefaultAdminRoles[1] = GUARDIAN.addr;
         nonDefaultAdminRoles[2] = STRATEGIST.addr;
-        nonDefaultAdminRoles[3] = makeAddr("RANDOM_ADDR");
+        nonDefaultAdminRoles[3] = KEEPER.addr;
+        nonDefaultAdminRoles[4] = makeAddr("RANDOM_ADDR");
 
         for (uint8 i = 0; i < nonDefaultAdminRoles.length; i++) {
             vm.startPrank(nonDefaultAdminRoles[i]);
@@ -237,10 +238,11 @@ contract VaultStrategyTest is VaultBaseTest {
         vm.startPrank(DEFAULT_ADMIN.addr);
         sut.addStrategy(address(strategyMock), 1000, 0);
 
-        address[] memory nonAdminRoles = new address[](3);
+        address[] memory nonAdminRoles = new address[](4);
         nonAdminRoles[0] = GUARDIAN.addr;
         nonAdminRoles[1] = STRATEGIST.addr;
-        nonAdminRoles[2] = makeAddr("RANDOM_ADDR");
+        nonAdminRoles[2] = KEEPER.addr;
+        nonAdminRoles[3] = makeAddr("RANDOM_ADDR");
 
         for (uint8 i = 0; i < nonAdminRoles.length; i++) {
             vm.startPrank(nonAdminRoles[i]);

@@ -73,6 +73,7 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
      * Also note that roles are cascading. So any higher privileged role should be able to perform all the functions
      * of any lower privileged role.
      */
+    bytes32 public constant KEEPER = keccak256("KEEPER");
     bytes32 public constant STRATEGIST = keccak256("STRATEGIST");
     bytes32 public constant GUARDIAN = keccak256("GUARDIAN");
     bytes32 public constant ADMIN = keccak256("ADMIN");
@@ -662,7 +663,7 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
      * @notice Function for updating the Vault Management fee(in BPS).
      */
     function updateManagementFeeBPS(uint16 _feeBPS) external {
-        _atLeastRole(ADMIN);
+        _atLeastRole(KEEPER);
         _validateManagementFeeValue(_feeBPS);
         managementFeeBPS = _feeBPS;
         emit ManagementFeeBPSUpdated(_feeBPS);
@@ -699,11 +700,12 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
      *      order, for example, [SUPER-ADMIN, ADMIN, GUARDIAN, STRATEGIST].
      */
     function _cascadingAccessRoles() internal pure override returns (bytes32[] memory) {
-        bytes32[] memory cascadingAccessRoles = new bytes32[](4);
+        bytes32[] memory cascadingAccessRoles = new bytes32[](5);
         cascadingAccessRoles[0] = DEFAULT_ADMIN_ROLE;
         cascadingAccessRoles[1] = ADMIN;
         cascadingAccessRoles[2] = GUARDIAN;
         cascadingAccessRoles[3] = STRATEGIST;
+        cascadingAccessRoles[4] = KEEPER;
         return cascadingAccessRoles;
     }
 

@@ -21,6 +21,7 @@ abstract contract VaultBaseTest is Test {
     Account internal ADMIN = makeAccount("ADMIN");
     Account internal GUARDIAN = makeAccount("GUARDIAN");
     Account internal STRATEGIST = makeAccount("STRATEGIST");
+    Account internal KEEPER = makeAccount("KEEPER");
 
     event StrategyAdded(address indexed strategy, uint256 feeBPS, uint256 allocBPS);
     event StrategyFeeBPSUpdated(address indexed strategy, uint256 feeBPS);
