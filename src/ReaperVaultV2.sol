@@ -2,16 +2,18 @@
 
 pragma solidity ^0.8.0;
 
-import "./interfaces/IERC4626Events.sol";
-import "./interfaces/IStrategy.sol";
-import "./libraries/ReaperMathUtils.sol";
-import "./mixins/ReaperAccessControl.sol";
-import "oz/access/AccessControlEnumerable.sol";
-import "oz/security/ReentrancyGuard.sol";
-import "oz/token/ERC20/ERC20.sol";
-import "oz/token/ERC20/extensions/IERC20Metadata.sol";
-import "oz/token/ERC20/utils/SafeERC20.sol";
-import "oz/utils/math/Math.sol";
+import {IERC4626Events} from "./interfaces/IERC4626Events.sol";
+import {IStrategy} from "./interfaces/IStrategy.sol";
+import {IFeeController} from "./interfaces/IFeeController.sol";
+import {ReaperMathUtils} from "./libraries/ReaperMathUtils.sol";
+import {ReaperAccessControl} from "./mixins/ReaperAccessControl.sol";
+import {KEEPER, STRATEGIST, GUARDIAN, ADMIN} from "./Roles.sol";
+import {AccessControlEnumerable} from "oz/access/AccessControlEnumerable.sol";
+import {ReentrancyGuard} from "oz/security/ReentrancyGuard.sol";
+import {ERC20} from "oz/token/ERC20/ERC20.sol";
+import {IERC20Metadata} from "oz/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "oz/token/ERC20/utils/SafeERC20.sol";
+import {Math} from "oz/utils/math/Math.sol";
 
 /**
  * @notice Implementation of a vault to deposit funds for yield optimizing.
@@ -42,7 +44,8 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
     uint256 public constant SECONDS_PER_YEAR = 365.25 days;
 
     uint256 public tvlCap;
-    uint16 public managementFeeBPS; //Vault management fee, in BPS
+    uint16 public immutable managementFeeCapBPS;
+    IFeeController public immutable feeController;
 
     uint256 public totalIdle; // Amount of tokens in the vault
     uint256 public totalAllocBPS; // Sum of allocBPS across all strategies (in BPS, <= 10k)
@@ -60,29 +63,10 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
     uint256 public lockedProfitDegradation; // rate per block of degradation. DEGRADATION_COEFFICIENT is 100% per block
     uint256 public lockedProfit; // how much profit is locked and cant be withdrawn
 
-    /**
-     * Reaper Roles in increasing order of privilege.
-     * {STRATEGIST} - Role conferred to authors of the strategy, allows for tweaking non-critical params.
-     * {GUARDIAN} - Multisig requiring 2 signatures for invoking emergency measures.
-     * {ADMIN}- Multisig requiring 3 signatures for deactivating emergency measures and changing TVL cap.
-     *
-     * The DEFAULT_ADMIN_ROLE (in-built access control role) will be granted to a multisig requiring 4
-     * signatures. This role would have the ability to add strategies, as well as the ability to grant any other
-     * roles.
-     *
-     * Also note that roles are cascading. So any higher privileged role should be able to perform all the functions
-     * of any lower privileged role.
-     */
-    bytes32 public constant KEEPER = keccak256("KEEPER");
-    bytes32 public constant STRATEGIST = keccak256("STRATEGIST");
-    bytes32 public constant GUARDIAN = keccak256("GUARDIAN");
-    bytes32 public constant ADMIN = keccak256("ADMIN");
-
     address public treasury; // address to whom performance fee is remitted in the form of vault shares
 
     event StrategyAdded(address indexed strategy, uint256 feeBPS, uint256 allocBPS);
     event StrategyFeeBPSUpdated(address indexed strategy, uint256 feeBPS);
-    event ManagementFeeBPSUpdated(uint256 feeBPS);
     event StrategyAllocBPSUpdated(address indexed strategy, uint256 allocBPS);
     event StrategyRevoked(address indexed strategy);
     event UpdateWithdrawalQueue(address[] withdrawalQueue);
@@ -117,20 +101,22 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
         string memory _name,
         string memory _symbol,
         uint256 _tvlCap,
-        uint16 _managementFeeBPS,
+        uint16 _managementFeeCapBPS,
         address _treasury,
         address[] memory _strategists,
-        address[] memory _multisigRoles
+        address[] memory _multisigRoles,
+        address _feeController
     ) ERC20(string(_name), string(_symbol)) {
         token = IERC20Metadata(_token);
         constructionTime = block.timestamp;
         lastReport = block.timestamp;
         tvlCap = _tvlCap;
         treasury = _treasury;
-        _validateManagementFeeValue(_managementFeeBPS);
-        managementFeeBPS = _managementFeeBPS;
+        _validateManagementFeeCapValue(_managementFeeCapBPS);
+        managementFeeCapBPS = _managementFeeCapBPS;
         lockedProfitDegradation = (DEGRADATION_COEFFICIENT * 46) / 10 ** 6; // 6 hours in blocks
 
+        feeController = IFeeController(_feeController);
         uint256 numStrategists = _strategists.length;
         for (uint256 i = 0; i < numStrategists; i = i.uncheckedInc()) {
             _grantRole(STRATEGIST, _strategists[i]);
@@ -470,8 +456,14 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
 
         uint256 duration = block.timestamp - strategies[strategy].lastReport;
 
+        uint16 fetchedManagementFeeBPS = feeController.fetchManagementFeeBPS();
+
+        if (fetchedManagementFeeBPS > managementFeeCapBPS) {
+            fetchedManagementFeeBPS = managementFeeCapBPS;
+        }
+
         uint256 managementFee =
-            (strategies[strategy].allocated * duration * managementFeeBPS) / PERCENT_DIVISOR / SECONDS_PER_YEAR;
+            (strategies[strategy].allocated * duration * fetchedManagementFeeBPS) / PERCENT_DIVISOR / SECONDS_PER_YEAR;
 
         uint256 totalFeeShares = 0;
 
@@ -660,16 +652,6 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
     }
 
     /**
-     * @notice Function for updating the Vault Management fee(in BPS).
-     */
-    function updateManagementFeeBPS(uint16 _feeBPS) external {
-        _atLeastRole(KEEPER);
-        _validateManagementFeeValue(_feeBPS);
-        managementFeeBPS = _feeBPS;
-        emit ManagementFeeBPSUpdated(_feeBPS);
-    }
-
-    /**
      * @dev Rescues random funds stuck that the strat can't handle.
      * @param _token address of the token to rescue.
      */
@@ -717,7 +699,11 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
         return hasRole(_role, _account);
     }
 
-    function _validateManagementFeeValue(uint16 _feeBPS) internal pure {
-        require(_feeBPS <= PERCENT_DIVISOR / 20, "Management fee cannot be higher than 500 BPS(5%)");
+    function _validateManagementFeeCapValue(uint16 _feeCapBPS) internal pure {
+        require(_feeCapBPS <= PERCENT_DIVISOR, "Management fee cannot exceed 10_000 BPS(100%)");
+    }
+
+    function _validateManagementFeeValue(uint16 _feeBPS) internal view {
+        require(_feeBPS <= managementFeeCapBPS, "Management fee cannot exceed the cap");
     }
 }

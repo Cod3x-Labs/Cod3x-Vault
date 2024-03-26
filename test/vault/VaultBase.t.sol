@@ -4,16 +4,18 @@ pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
 import {ReaperVaultV2} from "../../src/ReaperVaultV2.sol";
-import {ERC20Mock} from "../mock/ERC20Mock.sol";
-import {StrategyMock} from "../mock/StrategyMock.sol";
+import {ERC20Mock} from "./mock/ERC20Mock.sol";
+import {StrategyMock} from "./mock/StrategyMock.sol";
+import {FeeControllerMock} from "./mock/FeeControllerMock.sol";
 
 abstract contract VaultBaseTest is Test {
     ReaperVaultV2 internal sut;
     StrategyMock internal strategyMock;
     ERC20Mock internal assetMock;
+    FeeControllerMock internal feeControllerMock;
 
     uint256 internal constant TVL_CAP = 1_000_000 * 1e18;
-    uint16 internal constant MANAGEMENT_FEE_BPS = 200;
+    uint16 internal constant MANAGEMENT_FEE_CAP_BPS = 5_000;
     uint256 internal ALLOCATION_CAP;
 
     Account internal TREASURY = makeAccount("TREASURY");
@@ -40,6 +42,8 @@ abstract contract VaultBaseTest is Test {
 
     function setUp() public {
         assetMock = new ERC20Mock("mockAssetToken", "MAT");
+        feeControllerMock = new FeeControllerMock();
+        feeControllerMock.updateManagementFeeBPS(500);
 
         address[] memory strategists = new address[](1);
         strategists[0] = STRATEGIST.addr;
@@ -53,7 +57,15 @@ abstract contract VaultBaseTest is Test {
         vm.startPrank(DEFAULT_ADMIN.addr);
 
         sut = new ReaperVaultV2(
-            address(assetMock), "Vault", "V", TVL_CAP, MANAGEMENT_FEE_BPS, TREASURY.addr, strategists, multisigRoles
+            address(assetMock),
+            "Vault",
+            "V",
+            TVL_CAP,
+            MANAGEMENT_FEE_CAP_BPS,
+            TREASURY.addr,
+            strategists,
+            multisigRoles,
+            address(feeControllerMock)
         );
 
         strategyMock = new StrategyMock();

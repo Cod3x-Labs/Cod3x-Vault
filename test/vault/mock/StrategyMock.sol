@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-import {IStrategy} from "../../src/interfaces/IStrategy.sol";
+import {IStrategy} from "../../../src/interfaces/IStrategy.sol";
 import {IERC20} from "oz/token/ERC20/IERC20.sol";
 
 contract StrategyMock is IStrategy {

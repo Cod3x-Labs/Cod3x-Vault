@@ -108,9 +108,9 @@ contract VaultReportTest is VaultBaseTest {
         int256 roi = int256(20_000 * 10 ** sut.decimals());
         uint256 repayment = 5_000 * 10 ** sut.decimals();
         strategyMock.approveVaultSpender();
-        uint256 strategyDebt = sut.report(-roi, repayment);
+        sut.report(-roi, repayment);
 
-        (,, uint256 allocBPS, uint256 allocated,,,) = sut.strategies(address(strategyMock));
+        (,,, uint256 allocated,,,) = sut.strategies(address(strategyMock));
 
         assertEq(
             vaultDepositBalance * stratAllocationBPS / sut.PERCENT_DIVISOR() - uint256(roi) - repayment,
@@ -163,8 +163,28 @@ contract VaultReportTest is VaultBaseTest {
 
         uint256 strategyAllocation = vaultDepositBalance * stratAllocationBPS / sut.PERCENT_DIVISOR();
         uint256 duration = daysSinceLastReport * 1 days;
+        uint256 expectedTreasuryBalance = strategyAllocation * duration * feeControllerMock.fetchManagementFeeBPS()
+            / sut.PERCENT_DIVISOR() / sut.SECONDS_PER_YEAR();
+        assertEq(sut.balanceOf(TREASURY.addr), expectedTreasuryBalance);
+    }
+
+    function testGivenManagementFeeAboveCapWhenReportThenDefaultsToManagementFeeCap() public {
+        uint256 daysSinceLastReport = 100;
+        uint256 stratAllocationBPS = 5_000; //50%
+        uint256 vaultDepositBalance = 500_000 * 10 ** sut.decimals();
+        uint256 startLastReportTime = block.timestamp;
+        _simulateStratInitialAllocation(vaultDepositBalance, 0, stratAllocationBPS);
+
+        strategyMock.approveVaultSpender();
+        _timeTravel(startLastReportTime, daysSinceLastReport);
+        feeControllerMock.updateManagementFeeBPS(MANAGEMENT_FEE_CAP_BPS + 2_000);
+        sut.report(0, 0);
+
+        uint256 strategyAllocation = vaultDepositBalance * stratAllocationBPS / sut.PERCENT_DIVISOR();
+        uint256 duration = daysSinceLastReport * 1 days;
+        uint16 expectedManagementFee = MANAGEMENT_FEE_CAP_BPS;
         uint256 expectedTreasuryBalance =
-            strategyAllocation * duration * sut.managementFeeBPS() / sut.PERCENT_DIVISOR() / sut.SECONDS_PER_YEAR();
+            strategyAllocation * duration * expectedManagementFee / sut.PERCENT_DIVISOR() / sut.SECONDS_PER_YEAR();
         assertEq(sut.balanceOf(TREASURY.addr), expectedTreasuryBalance);
     }
 
@@ -185,8 +205,8 @@ contract VaultReportTest is VaultBaseTest {
 
         uint256 strategyAllocation = vaultDepositBalance * stratAllocationBPS / sut.PERCENT_DIVISOR();
         uint256 duration = daysSinceLastReport * 1 days;
-        uint256 expectedManagementFee =
-            strategyAllocation * duration * sut.managementFeeBPS() / sut.PERCENT_DIVISOR() / sut.SECONDS_PER_YEAR();
+        uint256 expectedManagementFee = strategyAllocation * duration * feeControllerMock.fetchManagementFeeBPS()
+            / sut.PERCENT_DIVISOR() / sut.SECONDS_PER_YEAR();
         uint256 expectedPerformanceFee = uint256(roi) * stratFeeBPS / sut.PERCENT_DIVISOR();
         assertEq(sut.balanceOf(TREASURY.addr), expectedManagementFee + expectedPerformanceFee);
     }

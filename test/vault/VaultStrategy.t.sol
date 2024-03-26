@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {VaultBaseTest} from "./VaultBase.t.sol";
-import {StrategyMock} from "../mock/StrategyMock.sol";
+import {StrategyMock} from "./mock/StrategyMock.sol";
 
 contract VaultStrategyTest is VaultBaseTest {
     /*//////////////////////////////////////////////////////////////////////////
