@@ -2,16 +2,19 @@
 
 pragma solidity ^0.8.0;
 
-import "./interfaces/IStrategy.sol";
-import "./interfaces/ISwapper.sol";
-import "./interfaces/IVault.sol";
-import "./interfaces/IVeloRouter.sol";
-import "./libraries/ReaperMathUtils.sol";
-import "./mixins/ReaperAccessControl.sol";
-import "oz-upgradeable/access/AccessControlEnumerableUpgradeable.sol";
-import "oz-upgradeable/proxy/utils/Initializable.sol";
-import "oz-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "oz-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import {IStrategy} from "./interfaces/IStrategy.sol";
+import {ISwapper, MinAmountOutData, UniV3SwapData, MinAmountOutKind} from "./interfaces/ISwapper.sol";
+import {IVault} from "./interfaces/IVault.sol";
+import {IVeloRouter} from "./interfaces/IVeloRouter.sol";
+import {ReaperMathUtils} from "./libraries/ReaperMathUtils.sol";
+import {ReaperAccessControl} from "./mixins/ReaperAccessControl.sol";
+import {KEEPER, STRATEGIST, GUARDIAN, ADMIN} from "./Roles.sol";
+import {
+    AccessControlEnumerableUpgradeable,
+    MathUpgradeable
+} from "oz-upgradeable/access/AccessControlEnumerableUpgradeable.sol";
+import {UUPSUpgradeable} from "oz-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {SafeERC20Upgradeable, IERC20Upgradeable} from "oz-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
 abstract contract ReaperBaseStrategyv4 is
     ReaperAccessControl,
@@ -33,25 +36,6 @@ abstract contract ReaperBaseStrategyv4 is
     uint256 public lastHarvestTimestamp;
 
     uint256 public upgradeProposalTime;
-
-    /**
-     * Reaper Roles in increasing order of privilege.
-     * {KEEPER} - Stricly permissioned trustless access for off-chain programs or third party keepers.
-     * {STRATEGIST} - Role conferred to authors of the strategy, allows for tweaking non-critical params.
-     * {GUARDIAN} - Multisig requiring 2 signatures for emergency measures such as pausing and panicking.
-     * {ADMIN}- Multisig requiring 3 signatures for unpausing.
-     *
-     * The DEFAULT_ADMIN_ROLE (in-built access control role) will be granted to a multisig requiring 4
-     * signatures. This role would have upgrading capability, as well as the ability to grant any other
-     * roles.
-     *
-     * Also note that roles are cascading. So any higher privileged role should be able to perform all the functions
-     * of any lower privileged role.
-     */
-    bytes32 public constant KEEPER = keccak256("KEEPER");
-    bytes32 public constant STRATEGIST = keccak256("STRATEGIST");
-    bytes32 public constant GUARDIAN = keccak256("GUARDIAN");
-    bytes32 public constant ADMIN = keccak256("ADMIN");
 
     enum ExchangeType {
         UniV2,
