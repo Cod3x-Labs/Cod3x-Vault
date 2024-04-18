@@ -113,8 +113,8 @@ abstract contract UniV3Mixin is ISwapErrors {
     }
 
     // Child contract may provide the possible set of Uni-V3 fee values (in basis points)
-    // Here we provide a default set of 4 possible fee values
+    // Here we provide a default maximum of 3%
     function _isValidFee(uint24 _fee) internal virtual returns (bool) {
-        return _fee == 100 || _fee == 500 || _fee == 3_000 || _fee == 10_000;
+        return _fee <= 30_000;
     }
 }
