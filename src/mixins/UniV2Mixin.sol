@@ -23,7 +23,8 @@ abstract contract UniV2Mixin is ISwapErrors {
         uint256 _amount,
         uint256 _minAmountOut,
         address _router,
-        uint256 _deadline
+        uint256 _deadline,
+        bool _tryCatchActive
     ) internal returns (uint256 amountOut) {
         if (_from == _to || _amount == 0) {
             return 0;
@@ -39,13 +40,22 @@ abstract contract UniV2Mixin is ISwapErrors {
 
         uint256 toBalBefore = IERC20(_to).balanceOf(address(this));
         IERC20(_from).safeIncreaseAllowance(_router, _amount);
-        try IUniswapV2Router02(_router).swapExactTokensForTokensSupportingFeeOnTransferTokens(
-            _amount, _minAmountOut, path, address(this), _deadline
-        ) {
+
+        // Based on configurable param catch fails or just revert
+        if (_tryCatchActive != false) {
+            try IUniswapV2Router02(_router).swapExactTokensForTokensSupportingFeeOnTransferTokens(
+                _amount, _minAmountOut, path, address(this), _deadline
+            ) {
+                amountOut = IERC20(_to).balanceOf(address(this)) - toBalBefore;
+            } catch {
+                IERC20(_from).safeApprove(_router, 0);
+                emit SwapFailed(_router, _amount, _minAmountOut, _from, _to);
+            }
+        } else {
+            IUniswapV2Router02(_router).swapExactTokensForTokensSupportingFeeOnTransferTokens(
+                _amount, _minAmountOut, path, address(this), _deadline
+            );
             amountOut = IERC20(_to).balanceOf(address(this)) - toBalBefore;
-        } catch {
-            IERC20(_from).safeApprove(_router, 0);
-            emit SwapFailed(_router, _amount, _minAmountOut, _from, _to);
         }
     }
 
@@ -87,7 +97,7 @@ abstract contract UniV2Mixin is ISwapErrors {
         uint256 nominator = IUniswapV2Router02(_router).getAmountOut(halfInvestment, _reserveA, _reserveB);
         uint256 denominator =
             IUniswapV2Router02(_router).quote(halfInvestment, _reserveA + halfInvestment, _reserveB - nominator);
-        swapAmount = _investmentA - (Babylonian.sqrt(halfInvestment * halfInvestment * nominator / denominator));
+        swapAmount = _investmentA - (Babylonian.sqrt((halfInvestment * halfInvestment * nominator) / denominator));
     }
 
     /// @dev Update {SwapPath} for a specified pair of tokens.

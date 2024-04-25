@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import "./interfaces/IStrategy.sol";
 import "./interfaces/ISwapper.sol";
 import "./interfaces/IVault.sol";
-import "./interfaces/IVeloRouter.sol";
+import "./interfaces/IThenaRamRouter.sol";
 import "./libraries/ReaperMathUtils.sol";
 import "./mixins/ReaperAccessControl.sol";
 import "oz-upgradeable/access/AccessControlEnumerableUpgradeable.sol";
@@ -56,7 +56,7 @@ abstract contract ReaperBaseStrategyv4 is
     enum ExchangeType {
         UniV2,
         Bal,
-        VeloSolid,
+        ThenaRam,
         UniV3
     }
 
@@ -305,9 +305,9 @@ abstract contract ReaperBaseStrategyv4 is
         } else if (_step.exType == ExchangeType.Bal) {
             bytes32 poolID = swapper.balSwapPoolIDs(_step.start, _step.end, _step.exchangeAddress);
             require(poolID != bytes32(0), "Pool ID for step not registered in swapper");
-        } else if (_step.exType == ExchangeType.VeloSolid) {
-            IVeloRouter.Route memory pathElement =
-                swapper.veloSwapPaths(_step.start, _step.end, _step.exchangeAddress, 0);
+        } else if (_step.exType == ExchangeType.ThenaRam) {
+            IThenaRamRouter.route memory pathElement =
+                swapper.thenaRamSwapPaths(_step.start, _step.end, _step.exchangeAddress, 0);
             require(pathElement.from != address(0), "Path for step not registered in swapper");
         } else if (_step.exType == ExchangeType.UniV3) {
             UniV3SwapData memory swapData = swapper.uniV3SwapPaths(_step.start, _step.end, _step.exchangeAddress);
@@ -486,8 +486,8 @@ abstract contract ReaperBaseStrategyv4 is
                 swapper.swapUniV2(step.start, step.end, amount, step.minAmountOutData, step.exchangeAddress);
             } else if (step.exType == ExchangeType.Bal) {
                 swapper.swapBal(step.start, step.end, amount, step.minAmountOutData, step.exchangeAddress);
-            } else if (step.exType == ExchangeType.VeloSolid) {
-                swapper.swapVelo(step.start, step.end, amount, step.minAmountOutData, step.exchangeAddress);
+            } else if (step.exType == ExchangeType.ThenaRam) {
+                swapper.swapThenaRam(step.start, step.end, amount, step.minAmountOutData, step.exchangeAddress);
             } else if (step.exType == ExchangeType.UniV3) {
                 swapper.swapUniV3(step.start, step.end, amount, step.minAmountOutData, step.exchangeAddress);
             } else {
