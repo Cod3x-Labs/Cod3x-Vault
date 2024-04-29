@@ -7,7 +7,7 @@ import {IStrategy} from "./interfaces/IStrategy.sol";
 import {IFeeController} from "./interfaces/IFeeController.sol";
 import {ReaperMathUtils} from "./libraries/ReaperMathUtils.sol";
 import {ReaperAccessControl} from "./mixins/ReaperAccessControl.sol";
-import {KEEPER, STRATEGIST, GUARDIAN, ADMIN} from "./Roles.sol";
+import {STRATEGIST, GUARDIAN, ADMIN} from "./Roles.sol";
 import {AccessControlEnumerable} from "oz/access/AccessControlEnumerable.sol";
 import {ReentrancyGuard} from "oz/security/ReentrancyGuard.sol";
 import {ERC20} from "oz/token/ERC20/ERC20.sol";
@@ -687,7 +687,6 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
         cascadingAccessRoles[1] = ADMIN;
         cascadingAccessRoles[2] = GUARDIAN;
         cascadingAccessRoles[3] = STRATEGIST;
-        cascadingAccessRoles[4] = KEEPER;
         return cascadingAccessRoles;
     }
 
