@@ -479,7 +479,8 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
 
         _mint(treasury, totalFeeShares);
 
-        return totalFeeShares;
+        uint256 totalFees = performanceFee + managementFee;
+        return totalFees;
     }
 
     // To avoid "stack too deep" errors
