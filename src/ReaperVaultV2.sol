@@ -701,8 +701,4 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
     function _validateManagementFeeCapValue(uint16 _feeCapBPS) internal pure {
         require(_feeCapBPS <= PERCENT_DIVISOR, "Management fee cannot exceed 10_000 BPS(100%)");
     }
-
-    function _validateManagementFeeValue(uint16 _feeBPS) internal view {
-        require(_feeBPS <= managementFeeCapBPS, "Management fee cannot exceed the cap");
-    }
 }
