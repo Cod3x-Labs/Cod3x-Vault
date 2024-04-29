@@ -74,6 +74,15 @@ contract CooldownUUPSUpgradeableTest is Test {
         sut.lockUpgrade();
     }
 
+    function testGivenMockedTimestampWhenLockUpgradeThenAddressIsSetToZero() public {
+        sut.initialize();
+
+        sut.unlockUpgrade(makeAddr("newImplementation"));
+        sut.lockUpgrade();
+
+        assertEq(sut.newImplementation(), address(0));
+    }
+
     function testGivenCooldownLockWhenUpgradeThenRevertsWithError() public {
         sut.initialize();
         CooldownUUPSUpgradeableImplV2 v2 = new CooldownUUPSUpgradeableImplV2();

@@ -40,6 +40,7 @@ abstract contract CooldownUUPSUpgradeable is UUPSUpgradeable, ICooldownUUPSUpgra
      */
     function _lockUpgrade() internal {
         upgradeUnlocksAt = _now() + (ONE_YEAR * 100);
+        newImplementation = address(0);
 
         emit UpgradeLocked(upgradeUnlocksAt);
     }
