@@ -52,7 +52,7 @@ abstract contract CooldownUUPSUpgradeable is UUPSUpgradeable, ICooldownUUPSUpgra
      */
     function _authorizeUpgrade(address _newImplementation) internal override {
         _authorizeUpgrade();
-        if (!_timePassed(upgradeUnlocksAt)) {
+        if (!_hasTimePassed(upgradeUnlocksAt)) {
             revert UpgradeIsLocked(upgradeUnlocksAt);
         }
 
@@ -62,7 +62,7 @@ abstract contract CooldownUUPSUpgradeable is UUPSUpgradeable, ICooldownUUPSUpgra
         _lockUpgrade();
     }
 
-    function _timePassed(uint256 time) private view returns (bool) {
+    function _hasTimePassed(uint256 time) private view returns (bool) {
         return time < _now();
     }
 
