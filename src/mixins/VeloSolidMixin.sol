@@ -27,7 +27,8 @@ abstract contract VeloSolidMixin is ISwapErrors {
         uint256 _amount,
         uint256 _minAmountOut,
         address _router,
-        uint256 _deadline
+        uint256 _deadline,
+        bool _tryCatchActive
     ) internal returns (uint256 amountOut) {
         if (_from == _to || _amount == 0) {
             return 0;
@@ -47,13 +48,21 @@ abstract contract VeloSolidMixin is ISwapErrors {
 
         uint256 toBalBefore = IERC20(_to).balanceOf(address(this));
         IERC20(_from).safeIncreaseAllowance(_router, _amount);
-        try router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
-            _amount, _minAmountOut, path, address(this), _deadline
-        ) {
+        // Based on configurable param catch fails or just revert
+        if (_tryCatchActive != false) {
+            try router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+                _amount, _minAmountOut, path, address(this), _deadline
+            ) {
+                amountOut = IERC20(_to).balanceOf(address(this)) - toBalBefore;
+            } catch {
+                IERC20(_from).safeApprove(_router, 0);
+                emit SwapFailed(_router, _amount, _minAmountOut, _from, _to);
+            }
+        } else {
+            router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+                _amount, _minAmountOut, path, address(this), _deadline
+            );
             amountOut = IERC20(_to).balanceOf(address(this)) - toBalBefore;
-        } catch {
-            IERC20(_from).safeApprove(_router, 0);
-            emit SwapFailed(_router, _amount, _minAmountOut, _from, _to);
         }
     }
 

@@ -28,7 +28,8 @@ abstract contract BalMixin is ISwapErrors {
         uint256 _amount,
         uint256 _minAmountOut,
         address _vault,
-        uint256 _deadline
+        uint256 _deadline,
+        bool _tryCatchActive
     ) internal returns (uint256 amountOut) {
         if (_from == _to || _amount == 0) {
             return 0;
@@ -58,14 +59,19 @@ abstract contract BalMixin is ISwapErrors {
             IERC20(_from).safeIncreaseAllowance(_vault, _amount - currentAllowance);
         }
 
-        try IBeetVault(_vault).swap(singleSwap, funds, _minAmountOut, _deadline) returns (uint256 tmpAmountOut) {
-            amountOut = tmpAmountOut;
-        } catch {
-            // Reset allowance iff we had to increase it.
-            if (_amount > currentAllowance) {
-                IERC20(_from).safeApprove(_vault, 0);
+        // Based on configurable param catch fails or just revert
+        if (_tryCatchActive != false) {
+            try IBeetVault(_vault).swap(singleSwap, funds, _minAmountOut, _deadline) returns (uint256 tmpAmountOut) {
+                amountOut = tmpAmountOut;
+            } catch {
+                // Reset allowance iff we had to increase it.
+                if (_amount > currentAllowance) {
+                    IERC20(_from).safeApprove(_vault, 0);
+                }
+                emit SwapFailed(_vault, _amount, _minAmountOut, _from, _to);
             }
-            emit SwapFailed(_vault, _amount, _minAmountOut, _from, _to);
+        } else {
+            amountOut = IBeetVault(_vault).swap(singleSwap, funds, _minAmountOut, _deadline);
         }
     }
 
