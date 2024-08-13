@@ -11,6 +11,7 @@ abstract contract CooldownUUPSUpgradeable is UUPSUpgradeable, ICooldownUUPSUpgra
     uint256 public constant UPGRADE_TIMELOCK = 48 hours;
     uint256 public constant ONE_YEAR = 365 days;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
