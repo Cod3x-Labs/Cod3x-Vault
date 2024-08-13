@@ -182,17 +182,17 @@ contract VaultStrategyTest is VaultBaseTest {
         vm.startPrank(DEFAULT_ADMIN.addr);
         sut.addStrategy(address(strategyMock), 0, 0);
 
-        vm.expectRevert("Fee cannot be higher than 20 BPS");
+        vm.expectRevert("Performance fee cannot exceed 10_000 BPS(100%)");
 
-        sut.updateStrategyFeeBPS(address(strategyMock), 2000 + 1);
+        sut.updateStrategyFeeBPS(address(strategyMock), 10_000 + 1);
     }
 
     function testGivenFeeWhenUpdateStrategyFeeThenUpdatesFee() public {
         vm.startPrank(DEFAULT_ADMIN.addr);
         sut.addStrategy(address(strategyMock), 1000, 0);
 
-        uint256 updatedFeeBPS = 2000;
-        sut.updateStrategyFeeBPS(address(strategyMock), 2000);
+        uint256 updatedFeeBPS = 10_000;
+        sut.updateStrategyFeeBPS(address(strategyMock), 10_000);
 
         (, uint256 feeBPS,,,,,) = sut.strategies(address(strategyMock));
 

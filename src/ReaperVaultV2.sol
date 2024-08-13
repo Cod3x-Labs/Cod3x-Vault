@@ -167,7 +167,7 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
     function updateStrategyFeeBPS(address _strategy, uint256 _feeBPS) external {
         _atLeastRole(ADMIN);
         require(strategies[_strategy].activation != 0, "Invalid strategy address");
-        require(_feeBPS <= PERCENT_DIVISOR / 5, "Fee cannot be higher than 20 BPS");
+        require(_feeBPS <= PERCENT_DIVISOR, "Performance fee cannot exceed 10_000 BPS(100%)");
         strategies[_strategy].feeBPS = _feeBPS;
         emit StrategyFeeBPSUpdated(_strategy, _feeBPS);
     }
