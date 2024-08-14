@@ -112,7 +112,7 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
         lastReport = block.timestamp;
         tvlCap = _tvlCap;
         treasury = _treasury;
-        _validateManagementFeeCapValue(_managementFeeCapBPS);
+        _validateFeeCapValue(_managementFeeCapBPS);
         managementFeeCapBPS = _managementFeeCapBPS;
         lockedProfitDegradation = (DEGRADATION_COEFFICIENT * 46) / 10 ** 6; // 6 hours in blocks
 
@@ -141,7 +141,7 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
         require(strategies[_strategy].activation == 0, "Strategy already added");
         require(address(this) == IStrategy(_strategy).vault(), "Strategy's vault does not match");
         require(address(token) == IStrategy(_strategy).want(), "Strategy's want does not match");
-        require(_feeBPS <= PERCENT_DIVISOR / 5, "Fee cannot be higher than 20 BPS");
+        _validateFeeCapValue(_feeBPS);
         require(_allocBPS + totalAllocBPS <= PERCENT_DIVISOR, "Invalid allocBPS value");
 
         strategies[_strategy] = StrategyParams({
@@ -167,7 +167,7 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
     function updateStrategyFeeBPS(address _strategy, uint256 _feeBPS) external {
         _atLeastRole(ADMIN);
         require(strategies[_strategy].activation != 0, "Invalid strategy address");
-        require(_feeBPS <= PERCENT_DIVISOR, "Performance fee cannot exceed 10_000 BPS(100%)");
+        _validateFeeCapValue(_feeBPS);
         strategies[_strategy].feeBPS = _feeBPS;
         emit StrategyFeeBPSUpdated(_strategy, _feeBPS);
     }
@@ -699,7 +699,7 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
         return hasRole(_role, _account);
     }
 
-    function _validateManagementFeeCapValue(uint16 _feeCapBPS) internal pure {
-        require(_feeCapBPS <= PERCENT_DIVISOR, "Management fee cannot exceed 10_000 BPS(100%)");
+    function _validateFeeCapValue(uint256 _feeCapBPS) internal pure {
+        require(_feeCapBPS <= PERCENT_DIVISOR, "Fee cannot exceed 10_000 BPS(100%)");
     }
 }
