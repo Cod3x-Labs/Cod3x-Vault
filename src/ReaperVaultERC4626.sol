@@ -18,10 +18,24 @@ contract ReaperVaultERC4626 is ReaperVaultV2, IERC4626Functions {
         string memory _name,
         string memory _symbol,
         uint256 _tvlCap,
+        uint16 _managementFeeCapBPS,
         address _treasury,
         address[] memory _strategists,
-        address[] memory _multisigRoles
-    ) ReaperVaultV2(_token, _name, _symbol, _tvlCap, _treasury, _strategists, _multisigRoles) {}
+        address[] memory _multisigRoles,
+        address _feeController
+    )
+        ReaperVaultV2(
+            _token,
+            _name,
+            _symbol,
+            _tvlCap,
+            _managementFeeCapBPS,
+            _treasury,
+            _strategists,
+            _multisigRoles,
+            _feeController
+        )
+    {}
 
     // The address of the underlying token used for the Vault for accounting, depositing, and withdrawing.
     // MUST be an ERC-20 token contract.

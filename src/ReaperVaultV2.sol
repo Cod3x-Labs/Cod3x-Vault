@@ -2,16 +2,18 @@
 
 pragma solidity ^0.8.0;
 
-import "./interfaces/IERC4626Events.sol";
-import "./interfaces/IStrategy.sol";
-import "./libraries/ReaperMathUtils.sol";
-import "./mixins/ReaperAccessControl.sol";
-import "oz/access/AccessControlEnumerable.sol";
-import "oz/security/ReentrancyGuard.sol";
-import "oz/token/ERC20/ERC20.sol";
-import "oz/token/ERC20/extensions/IERC20Metadata.sol";
-import "oz/token/ERC20/utils/SafeERC20.sol";
-import "oz/utils/math/Math.sol";
+import {IERC4626Events} from "./interfaces/IERC4626Events.sol";
+import {IStrategy} from "./interfaces/IStrategy.sol";
+import {IFeeController} from "./interfaces/IFeeController.sol";
+import {ReaperMathUtils} from "./libraries/ReaperMathUtils.sol";
+import {ReaperAccessControl} from "./mixins/ReaperAccessControl.sol";
+import {STRATEGIST, GUARDIAN, ADMIN} from "./Roles.sol";
+import {AccessControlEnumerable} from "oz/access/AccessControlEnumerable.sol";
+import {ReentrancyGuard} from "oz/security/ReentrancyGuard.sol";
+import {ERC20} from "oz/token/ERC20/ERC20.sol";
+import {IERC20Metadata} from "oz/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "oz/token/ERC20/utils/SafeERC20.sol";
+import {Math} from "oz/utils/math/Math.sol";
 
 /**
  * @notice Implementation of a vault to deposit funds for yield optimizing.
@@ -39,7 +41,11 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
 
     uint256 public constant DEGRADATION_COEFFICIENT = 10 ** 18; // The unit for calculating profit degradation.
     uint256 public constant PERCENT_DIVISOR = 10000;
+    uint256 public constant SECONDS_PER_YEAR = 365.25 days;
+
     uint256 public tvlCap;
+    uint16 public immutable managementFeeCapBPS;
+    IFeeController public immutable feeController;
 
     uint256 public totalIdle; // Amount of tokens in the vault
     uint256 public totalAllocBPS; // Sum of allocBPS across all strategies (in BPS, <= 10k)
@@ -56,23 +62,6 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
     uint256 public withdrawMaxLoss = 1;
     uint256 public lockedProfitDegradation; // rate per block of degradation. DEGRADATION_COEFFICIENT is 100% per block
     uint256 public lockedProfit; // how much profit is locked and cant be withdrawn
-
-    /**
-     * Reaper Roles in increasing order of privilege.
-     * {STRATEGIST} - Role conferred to authors of the strategy, allows for tweaking non-critical params.
-     * {GUARDIAN} - Multisig requiring 2 signatures for invoking emergency measures.
-     * {ADMIN}- Multisig requiring 3 signatures for deactivating emergency measures and changing TVL cap.
-     *
-     * The DEFAULT_ADMIN_ROLE (in-built access control role) will be granted to a multisig requiring 4
-     * signatures. This role would have the ability to add strategies, as well as the ability to grant any other
-     * roles.
-     *
-     * Also note that roles are cascading. So any higher privileged role should be able to perform all the functions
-     * of any lower privileged role.
-     */
-    bytes32 public constant STRATEGIST = keccak256("STRATEGIST");
-    bytes32 public constant GUARDIAN = keccak256("GUARDIAN");
-    bytes32 public constant ADMIN = keccak256("ADMIN");
 
     address public treasury; // address to whom performance fee is remitted in the form of vault shares
 
@@ -112,17 +101,22 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
         string memory _name,
         string memory _symbol,
         uint256 _tvlCap,
+        uint16 _managementFeeCapBPS,
         address _treasury,
         address[] memory _strategists,
-        address[] memory _multisigRoles
+        address[] memory _multisigRoles,
+        address _feeController
     ) ERC20(string(_name), string(_symbol)) {
         token = IERC20Metadata(_token);
         constructionTime = block.timestamp;
         lastReport = block.timestamp;
         tvlCap = _tvlCap;
         treasury = _treasury;
+        _validateFeeCapValue(_managementFeeCapBPS);
+        managementFeeCapBPS = _managementFeeCapBPS;
         lockedProfitDegradation = (DEGRADATION_COEFFICIENT * 46) / 10 ** 6; // 6 hours in blocks
 
+        feeController = IFeeController(_feeController);
         uint256 numStrategists = _strategists.length;
         for (uint256 i = 0; i < numStrategists; i = i.uncheckedInc()) {
             _grantRole(STRATEGIST, _strategists[i]);
@@ -147,7 +141,7 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
         require(strategies[_strategy].activation == 0, "Strategy already added");
         require(address(this) == IStrategy(_strategy).vault(), "Strategy's vault does not match");
         require(address(token) == IStrategy(_strategy).want(), "Strategy's want does not match");
-        require(_feeBPS <= PERCENT_DIVISOR / 5, "Fee cannot be higher than 20 BPS");
+        _validateFeeCapValue(_feeBPS);
         require(_allocBPS + totalAllocBPS <= PERCENT_DIVISOR, "Invalid allocBPS value");
 
         strategies[_strategy] = StrategyParams({
@@ -173,7 +167,7 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
     function updateStrategyFeeBPS(address _strategy, uint256 _feeBPS) external {
         _atLeastRole(ADMIN);
         require(strategies[_strategy].activation != 0, "Invalid strategy address");
-        require(_feeBPS <= PERCENT_DIVISOR / 5, "Fee cannot be higher than 20 BPS");
+        _validateFeeCapValue(_feeBPS);
         strategies[_strategy].feeBPS = _feeBPS;
         emit StrategyFeeBPSUpdated(_strategy, _feeBPS);
     }
@@ -451,20 +445,42 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
     }
 
     /**
-     * @notice Helper function to charge fees from the gain reported by a strategy.
+     * @notice Helper function to charge performance and management fees.
      * Fees is charged by issuing the corresponding amount of vault shares to the treasury.
      * @param strategy The strategy that reported gain.
-     * @param gain The amount of profit reported.
+     * @param gain The amount of profit reported. Can be 0
      * @return The fee amount in assets.
      */
     function _chargeFees(address strategy, uint256 gain) internal returns (uint256) {
         uint256 performanceFee = (gain * strategies[strategy].feeBPS) / PERCENT_DIVISOR;
-        if (performanceFee != 0) {
-            uint256 supply = totalSupply();
-            uint256 shares = supply == 0 ? performanceFee : (performanceFee * supply) / _freeFunds();
-            _mint(treasury, shares);
+
+        uint256 duration = block.timestamp - strategies[strategy].lastReport;
+
+        uint16 fetchedManagementFeeBPS = feeController.fetchManagementFeeBPS();
+
+        if (fetchedManagementFeeBPS > managementFeeCapBPS) {
+            fetchedManagementFeeBPS = managementFeeCapBPS;
         }
-        return performanceFee;
+
+        uint256 managementFee =
+            (strategies[strategy].allocated * duration * fetchedManagementFeeBPS) / PERCENT_DIVISOR / SECONDS_PER_YEAR;
+
+        uint256 totalFeeShares = 0;
+
+        uint256 supply = totalSupply();
+        if (performanceFee != 0) {
+            uint256 performanceFeeShares = supply == 0 ? performanceFee : (performanceFee * supply) / _freeFunds();
+            totalFeeShares += performanceFeeShares;
+        }
+        if (managementFee != 0) {
+            uint256 managementFeeShares = supply == 0 ? managementFee : (managementFee * supply) / _freeFunds();
+            totalFeeShares += managementFeeShares;
+        }
+
+        _mint(treasury, totalFeeShares);
+
+        uint256 totalFees = performanceFee + managementFee;
+        return totalFees;
     }
 
     // To avoid "stack too deep" errors
@@ -499,9 +515,10 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
             _reportLoss(vars.stratAddr, vars.loss);
         } else if (_roi > 0) {
             vars.gain = uint256(_roi);
-            vars.fees = _chargeFees(vars.stratAddr, vars.gain);
             strategy.gains += vars.gain;
         }
+
+        vars.fees = _chargeFees(vars.stratAddr, vars.gain);
 
         vars.available = availableCapital();
         if (vars.available < 0) {
@@ -530,7 +547,12 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
 
         // Profit is locked and gradually released per block
         // NOTE: compute current locked profit and replace with sum of current and new
-        vars.lockedProfitBeforeLoss = _calculateLockedProfit() + vars.gain - vars.fees;
+        uint256 calculatedLockedProfit = _calculateLockedProfit() + vars.gain;
+        if (calculatedLockedProfit > vars.fees) {
+            vars.lockedProfitBeforeLoss = calculatedLockedProfit - vars.fees;
+        } else {
+            vars.lockedProfitBeforeLoss = 0;
+        }
         if (vars.lockedProfitBeforeLoss > vars.loss) {
             lockedProfit = vars.lockedProfitBeforeLoss - vars.loss;
         } else {
@@ -661,7 +683,7 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
      *      order, for example, [SUPER-ADMIN, ADMIN, GUARDIAN, STRATEGIST].
      */
     function _cascadingAccessRoles() internal pure override returns (bytes32[] memory) {
-        bytes32[] memory cascadingAccessRoles = new bytes32[](4);
+        bytes32[] memory cascadingAccessRoles = new bytes32[](5);
         cascadingAccessRoles[0] = DEFAULT_ADMIN_ROLE;
         cascadingAccessRoles[1] = ADMIN;
         cascadingAccessRoles[2] = GUARDIAN;
@@ -675,5 +697,9 @@ contract ReaperVaultV2 is ReaperAccessControl, ERC20, IERC4626Events, AccessCont
      */
     function _hasRole(bytes32 _role, address _account) internal view override returns (bool) {
         return hasRole(_role, _account);
+    }
+
+    function _validateFeeCapValue(uint256 _feeCapBPS) internal pure {
+        require(_feeCapBPS <= PERCENT_DIVISOR, "Fee cannot exceed 10_000 BPS(100%)");
     }
 }

@@ -1,20 +1,20 @@
-// SPDX-License-Identifier: BUSL1.1
+// SPDX-License-Identifier: BUSL-1.1
 
 pragma solidity ^0.8.0;
 
-import "./interfaces/AggregatorV3Interface.sol";
-import "./interfaces/ISwapperSwaps.sol";
-import "./mixins/UniV2Mixin.sol";
-import "./mixins/BalMixin.sol";
-import "./mixins/UniV3Mixin.sol";
-import "./mixins/ThenaRamMixin.sol";
-import "./mixins/ReaperAccessControl.sol";
-import "./libraries/ReaperMathUtils.sol";
-import "oz-upgradeable/access/AccessControlEnumerableUpgradeable.sol";
-import "oz-upgradeable/proxy/utils/Initializable.sol";
-import "oz-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "oz-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
-import "oz-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import {AggregatorV3Interface} from "./interfaces/AggregatorV3Interface.sol";
+import {ISwapperSwaps, UniV3SwapData, MinAmountOutData, MinAmountOutKind} from "./interfaces/ISwapperSwaps.sol";
+import {UniV2Mixin} from "./mixins/UniV2Mixin.sol";
+import {BalMixin} from "./mixins/BalMixin.sol";
+import {ThenaRamMixin, IThenaRamRouter} from "./mixins/ThenaRamMixin.sol";
+import {UniV3Mixin} from "./mixins/UniV3Mixin.sol";
+import {ReaperAccessControl} from "./mixins/ReaperAccessControl.sol";
+import {ReaperMathUtils} from "./libraries/ReaperMathUtils.sol";
+import {STRATEGIST, GUARDIAN} from "./Roles.sol";
+import {AccessControlEnumerableUpgradeable} from "oz-upgradeable/access/AccessControlEnumerableUpgradeable.sol";
+import {UUPSUpgradeable} from "oz-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {IERC20MetadataUpgradeable} from "oz-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
+import {SafeERC20Upgradeable} from "oz-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
 contract ReaperSwapper is
     UniV2Mixin,
@@ -45,24 +45,6 @@ contract ReaperSwapper is
         AggregatorV3Interface aggregator;
         uint256 timeout; // this allows us to use different timeouts per asset/aggregator
     }
-
-    /**
-     * Reaper Roles in increasing order of privilege.
-     * {STRATEGIST} - Role conferred to authors of strategies, allows for setting swap paths.
-     * {GUARDIAN} - Multisig requiring 2 signatures, for clearing upgrade cooldowns.
-     * {DEFAULT_ADMIN_ROLE} - Multisig requiring 4 signatures.
-     *
-     * The DEFAULT_ADMIN_ROLE (in-built access control role) would have the capability to:
-     * - set uniV3 quoters
-     * - set chainlink aggregators
-     * - upgrade this contract
-     * - grant roles
-     *
-     * Note that roles are cascading. So any higher privileged role should be able to perform all the functions
-     * of any lower privileged role.
-     */
-    bytes32 public constant STRATEGIST = keccak256("STRATEGIST");
-    bytes32 public constant GUARDIAN = keccak256("GUARDIAN");
 
     // Use to convert a price answer to an 18-digit precision uint
     uint256 public constant TARGET_DIGITS = 18;
@@ -192,7 +174,7 @@ contract ReaperSwapper is
         MinAmountOutData memory _minAmountOutData,
         address _vault,
         uint256 _deadline
-    ) public returns (uint256) {
+    ) external returns (uint256) {
         return swapBal(_from, _to, _amount, _minAmountOutData, _vault, _deadline, true);
     }
 
@@ -226,7 +208,7 @@ contract ReaperSwapper is
         MinAmountOutData memory _minAmountOutData,
         address _router,
         uint256 _deadline
-    ) public returns (uint256) {
+    ) external returns (uint256) {
         return swapThenaRam(_from, _to, _amount, _minAmountOutData, _router, _deadline, true);
     }
 
@@ -260,7 +242,7 @@ contract ReaperSwapper is
         MinAmountOutData memory _minAmountOutData,
         address _router,
         uint256 _deadline
-    ) public returns (uint256) {
+    ) external returns (uint256) {
         return swapUniV3(_from, _to, _amount, _minAmountOutData, _router, _deadline, true);
     }
 
@@ -360,7 +342,12 @@ contract ReaperSwapper is
 
         // Secondly, try to get latest price data:
         try aggregatorData[_token].aggregator.latestRoundData() returns (
-            uint80 roundId, int256 answer, uint256, /* startedAt */ uint256 timestamp, uint80 /* answeredInRound */
+            uint80 roundId,
+            int256 answer,
+            uint256,
+            /* startedAt */
+            uint256 timestamp,
+            uint80 /* answeredInRound */
         ) {
             // If call to Chainlink succeeds, return the response and success = true
             chainlinkResponse.roundId = roundId;
@@ -380,13 +367,18 @@ contract ReaperSwapper is
         returns (ChainlinkResponse memory prevChainlinkResponse)
     {
         /*
-        * NOTE: Chainlink only offers a current decimals() value - there is no way to obtain the decimal precision used in a 
-        * previous round.  We assume the decimals used in the previous round are the same as the current round.
-        */
+         * NOTE: Chainlink only offers a current decimals() value - there is no way to obtain the decimal precision used in a
+         * previous round.  We assume the decimals used in the previous round are the same as the current round.
+         */
 
         // Try to get the price data from the previous round:
         try aggregatorData[_token].aggregator.getRoundData(_currentRoundId - 1) returns (
-            uint80 roundId, int256 answer, uint256, /* startedAt */ uint256 timestamp, uint80 /* answeredInRound */
+            uint80 roundId,
+            int256 answer,
+            uint256,
+            /* startedAt */
+            uint256 timestamp,
+            uint80 /* answeredInRound */
         ) {
             // If call to Chainlink succeeds, return the response and success = true
             prevChainlinkResponse.roundId = roundId;
@@ -402,13 +394,13 @@ contract ReaperSwapper is
     }
 
     /* Chainlink is considered broken if its current or previous round data is in any way bad. We check the previous round
-    * for two reasons:
-    *
-    * 1) It is necessary data for the price deviation check in case 1,
-    * and
-    * 2) Chainlink is the PriceFeed's preferred primary oracle - having two consecutive valid round responses adds
-    * peace of mind when using or returning to Chainlink.
-    */
+     * for two reasons:
+     *
+     * 1) It is necessary data for the price deviation check in case 1,
+     * and
+     * 2) Chainlink is the PriceFeed's preferred primary oracle - having two consecutive valid round responses adds
+     * peace of mind when using or returning to Chainlink.
+     */
     function _chainlinkIsBroken(ChainlinkResponse memory _currentResponse, ChainlinkResponse memory _prevResponse)
         internal
         view
@@ -423,7 +415,9 @@ contract ReaperSwapper is
         // Check for an invalid roundId that is 0
         if (_response.roundId == 0) return true;
         // Check for an invalid timeStamp that is 0, or in the future
-        if (_response.timestamp == 0 || _response.timestamp > block.timestamp) return true;
+        if (_response.timestamp == 0 || _response.timestamp > block.timestamp) {
+            return true;
+        }
         // Check for non-positive price
         if (_response.answer <= 0) return true;
 
