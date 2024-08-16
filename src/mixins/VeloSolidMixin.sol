@@ -50,7 +50,7 @@ abstract contract VeloSolidMixin is ISwapErrors {
         IERC20(_from).safeIncreaseAllowance(_router, _amount);
         // Based on configurable param catch fails or just revert
         if (_tryCatchActive != false) {
-            try router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+            try router.swapExactTokensForTokens(
                 _amount, _minAmountOut, path, address(this), _deadline
             ) {
                 amountOut = IERC20(_to).balanceOf(address(this)) - toBalBefore;
@@ -59,7 +59,7 @@ abstract contract VeloSolidMixin is ISwapErrors {
                 emit SwapFailed(_router, _amount, _minAmountOut, _from, _to);
             }
         } else {
-            router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+            router.swapExactTokensForTokens(
                 _amount, _minAmountOut, path, address(this), _deadline
             );
             amountOut = IERC20(_to).balanceOf(address(this)) - toBalBefore;
@@ -101,7 +101,7 @@ abstract contract VeloSolidMixin is ISwapErrors {
         for (uint256 i = 0; i < _path.length; i++) {
             if (i < _path.length - 1) {
                 require(_path[i].to == _path[i + 1].from);
-                IVeloV1AndV2Factory factory = IVeloV1AndV2Factory(_path[i].factory);
+                IVeloV1AndV2Factory factory = IVeloV1AndV2Factory(IVeloRouter(_router).factory());
                 address pair = factory.getPair(_path[i].from, _path[i].to, _path[i].stable);
                 bool isPair = factory.isPair(pair);
                 require(isPair);

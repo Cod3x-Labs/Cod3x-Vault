@@ -14,7 +14,6 @@ interface IVeloRouter {
         address from;
         address to;
         bool stable;
-        address factory;
     }
 
     error ConversionFromV2ToV1VeloProhibited();
@@ -447,4 +446,7 @@ interface IVeloRouter {
         external
         view
         returns (uint256 ratio);
+
+    // Returns current factory address
+    function factory() external view returns (address);
 }
