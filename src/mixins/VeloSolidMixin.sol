@@ -102,9 +102,9 @@ abstract contract VeloSolidMixin is ISwapErrors {
             if (i < _path.length - 1) {
                 require(_path[i].to == _path[i + 1].from);
                 IVeloV1AndV2Factory factory = IVeloV1AndV2Factory(IVeloRouter(_router).factory());
-                address pair = factory.getPair(_path[i].from, _path[i].to, _path[i].stable);
-                bool isPair = factory.isPair(pair);
-                require(isPair);
+                address pool = factory.getPool(_path[i].from, _path[i].to, _path[i].stable);
+                bool isPool = factory.isPool(pool);
+                require(isPool);
             }
             veloSwapPaths[_tokenIn][_tokenOut][_router].push(_path[i]);
         }
