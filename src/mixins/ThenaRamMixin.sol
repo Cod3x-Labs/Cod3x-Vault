@@ -50,7 +50,7 @@ abstract contract ThenaRamMixin is ISwapErrors {
         IERC20(_from).safeIncreaseAllowance(_router, _amount);
         // Based on configurable param catch fails or just revert
         if (_tryCatchActive != false) {
-            try router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+            try router.swapExactTokensForTokens(
                 _amount, _minAmountOut, path, address(this), _deadline
             ) {
                 amountOut = IERC20(_to).balanceOf(address(this)) - toBalBefore;
@@ -59,7 +59,7 @@ abstract contract ThenaRamMixin is ISwapErrors {
                 emit SwapFailed(_router, _amount, _minAmountOut, _from, _to);
             }
         } else {
-            router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+            router.swapExactTokensForTokens(
                 _amount, _minAmountOut, path, address(this), _deadline
             );
             amountOut = IERC20(_to).balanceOf(address(this)) - toBalBefore;
