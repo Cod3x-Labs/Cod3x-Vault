@@ -126,7 +126,7 @@ contract ReaperSwapper is
         address _router,
         uint256 _deadline,
         bool _tryCatchActive
-    ) public pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
+    ) public override pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
         uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
         return _swapUniV2(_from, _to, _amount, minAmountOut, _router, _deadline, _tryCatchActive);
     }
@@ -138,7 +138,7 @@ contract ReaperSwapper is
         MinAmountOutData memory _minAmountOutData,
         address _router,
         uint256 _deadline
-    ) public returns (uint256) {
+    ) public override returns (uint256) {
         return swapUniV2(_from, _to, _amount, _minAmountOutData, _router, _deadline, true);
     }
 
@@ -148,7 +148,7 @@ contract ReaperSwapper is
         uint256 _amount,
         MinAmountOutData memory _minAmountOutData,
         address _router
-    ) external returns (uint256) {
+    ) external override returns (uint256) {
         return swapUniV2(_from, _to, _amount, _minAmountOutData, _router, block.timestamp, true);
     }
 
@@ -160,7 +160,7 @@ contract ReaperSwapper is
         address _vault,
         uint256 _deadline,
         bool _tryCatchActive
-    ) public pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
+    ) public override pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
         uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
         return _swapBal(_from, _to, _amount, minAmountOut, _vault, _deadline, _tryCatchActive);
     }
@@ -172,7 +172,7 @@ contract ReaperSwapper is
         MinAmountOutData memory _minAmountOutData,
         address _vault,
         uint256 _deadline
-    ) external returns (uint256) {
+    ) external override returns (uint256) {
         return swapBal(_from, _to, _amount, _minAmountOutData, _vault, _deadline, true);
     }
 
@@ -182,7 +182,7 @@ contract ReaperSwapper is
         uint256 _amount,
         MinAmountOutData memory _minAmountOutData,
         address _vault
-    ) external returns (uint256) {
+    ) external override returns (uint256) {
         return swapBal(_from, _to, _amount, _minAmountOutData, _vault, block.timestamp, true);
     }
 
@@ -194,7 +194,7 @@ contract ReaperSwapper is
         address _router,
         uint256 _deadline,
         bool _tryCatchActive
-    ) public pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
+    ) public override pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
         uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
         return _swapVelo(_from, _to, _amount, minAmountOut, _router, _deadline, _tryCatchActive);
     }
@@ -206,7 +206,7 @@ contract ReaperSwapper is
         MinAmountOutData memory _minAmountOutData,
         address _router,
         uint256 _deadline
-    ) external returns (uint256) {
+    ) external override returns (uint256) {
         return swapVelo(_from, _to, _amount, _minAmountOutData, _router, _deadline, true);
     }
 
@@ -216,7 +216,7 @@ contract ReaperSwapper is
         uint256 _amount,
         MinAmountOutData memory _minAmountOutData,
         address _router
-    ) external returns (uint256) {
+    ) external override returns (uint256) {
         return swapVelo(_from, _to, _amount, _minAmountOutData, _router, block.timestamp, true);
     }
 
@@ -228,7 +228,7 @@ contract ReaperSwapper is
         address _router,
         uint256 _deadline,
         bool _tryCatchActive
-    ) public pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
+    ) public override pullFromBefore(_from, _amount) pushFromAndToAfter(_from, _to) returns (uint256) {
         uint256 minAmountOut = _calculateMinAmountOut(_from, _to, _amount, _minAmountOutData);
         return _swapUniV3(Params__swapUniV3(_from, _to, _amount, minAmountOut, _router, _deadline, _tryCatchActive));
     }
@@ -240,7 +240,7 @@ contract ReaperSwapper is
         MinAmountOutData memory _minAmountOutData,
         address _router,
         uint256 _deadline
-    ) external returns (uint256) {
+    ) external override returns (uint256) {
         return swapUniV3(_from, _to, _amount, _minAmountOutData, _router, _deadline, true);
     }
 
@@ -250,7 +250,7 @@ contract ReaperSwapper is
         uint256 _amount,
         MinAmountOutData memory _minAmountOutData,
         address _router
-    ) external returns (uint256) {
+    ) external override returns (uint256) {
         return swapUniV3(_from, _to, _amount, _minAmountOutData, _router, block.timestamp, true);
     }
 
