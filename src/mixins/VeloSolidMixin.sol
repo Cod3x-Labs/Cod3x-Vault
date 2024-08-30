@@ -50,18 +50,14 @@ abstract contract VeloSolidMixin is ISwapErrors {
         IERC20(_from).safeIncreaseAllowance(_router, _amount);
         // Based on configurable param catch fails or just revert
         if (_tryCatchActive != false) {
-            try router.swapExactTokensForTokens(
-                _amount, _minAmountOut, path, address(this), _deadline
-            ) {
+            try router.swapExactTokensForTokens(_amount, _minAmountOut, path, address(this), _deadline) {
                 amountOut = IERC20(_to).balanceOf(address(this)) - toBalBefore;
             } catch {
                 IERC20(_from).safeApprove(_router, 0);
                 emit SwapFailed(_router, _amount, _minAmountOut, _from, _to);
             }
         } else {
-            router.swapExactTokensForTokens(
-                _amount, _minAmountOut, path, address(this), _deadline
-            );
+            router.swapExactTokensForTokens(_amount, _minAmountOut, path, address(this), _deadline);
             amountOut = IERC20(_to).balanceOf(address(this)) - toBalBefore;
         }
     }
