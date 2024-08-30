@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-import "./IThenaRamRouter.sol";
+import "./IVeloRouter.sol";
 import "./ISwapperSwaps.sol";
 
 interface ISwapper is ISwapperSwaps {
@@ -10,9 +10,9 @@ interface ISwapper is ISwapperSwaps {
 
     function balSwapPoolIDs(address _from, address _to, address _vault) external returns (bytes32);
 
-    function thenaRamSwapPaths(address _from, address _to, address _router, uint256 _index)
+    function veloSwapPaths(address _from, address _to, address _router, uint256 _index)
         external
-        returns (IThenaRamRouter.route memory route);
+        returns (IVeloRouter.Route memory route);
 
     function uniV3SwapPaths(address _from, address _to, address _router) external view returns (UniV3SwapData memory);
 
@@ -23,12 +23,8 @@ interface ISwapper is ISwapperSwaps {
 
     function updateBalSwapPoolID(address _tokenIn, address _tokenOut, address _vault, bytes32 _poolID) external;
 
-    function updateThenaRamSwapPath(
-        address _tokenIn,
-        address _tokenOut,
-        address _router,
-        IThenaRamRouter.route[] memory _path
-    ) external;
+    function updateVeloSwapPath(address _tokenIn, address _tokenOut, address _router, IVeloRouter.Route[] memory _path)
+        external;
 
     function updateUniV3SwapPath(
         address _tokenIn,

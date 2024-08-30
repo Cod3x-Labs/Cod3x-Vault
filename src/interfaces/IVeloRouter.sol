@@ -3,8 +3,8 @@ pragma solidity ^0.8.0;
 
 import {IERC20} from "oz/token/ERC20/IERC20.sol";
 
-interface IThenaRamRouter {
-    struct route {
+interface IVeloRouter {
+    struct Route {
         address from;
         address to;
         bool stable;
@@ -29,7 +29,7 @@ interface IThenaRamRouter {
         returns (uint256 amount, bool stable);
 
     // performs chained getAmountOut calculations on any number of pairs
-    function getAmountsOut(uint256 amountIn, route[] memory routes) external view returns (uint256[] memory amounts);
+    function getAmountsOut(uint256 amountIn, Route[] memory routes) external view returns (uint256[] memory amounts);
 
     function quoteAddLiquidity(
         address tokenA,
@@ -129,12 +129,12 @@ interface IThenaRamRouter {
     function swapExactTokensForTokens(
         uint256 amountIn,
         uint256 amountOutMin,
-        route[] calldata routes,
+        Route[] calldata routes,
         address to,
         uint256 deadline
     ) external returns (uint256[] memory amounts);
 
-    function swapExactETHForTokens(uint256 amountOutMin, route[] calldata routes, address to, uint256 deadline)
+    function swapExactETHForTokens(uint256 amountOutMin, Route[] calldata routes, address to, uint256 deadline)
         external
         payable
         returns (uint256[] memory amounts);
@@ -142,14 +142,14 @@ interface IThenaRamRouter {
     function swapExactTokensForETH(
         uint256 amountIn,
         uint256 amountOutMin,
-        route[] calldata routes,
+        Route[] calldata routes,
         address to,
         uint256 deadline
     ) external returns (uint256[] memory amounts);
 
     function UNSAFE_swapExactTokensForTokens(
         uint256[] memory amounts,
-        route[] calldata routes,
+        Route[] calldata routes,
         address to,
         uint256 deadline
     ) external returns (uint256[] memory);
@@ -181,14 +181,14 @@ interface IThenaRamRouter {
     function swapExactTokensForTokensSupportingFeeOnTransferTokens(
         uint256 amountIn,
         uint256 amountOutMin,
-        route[] calldata routes,
+        Route[] calldata routes,
         address to,
         uint256 deadline
     ) external;
 
     function swapExactETHForTokensSupportingFeeOnTransferTokens(
         uint256 amountOutMin,
-        route[] calldata routes,
+        Route[] calldata routes,
         address to,
         uint256 deadline
     ) external payable;
@@ -196,7 +196,7 @@ interface IThenaRamRouter {
     function swapExactTokensForETHSupportingFeeOnTransferTokens(
         uint256 amountIn,
         uint256 amountOutMin,
-        route[] calldata routes,
+        Route[] calldata routes,
         address to,
         uint256 deadline
     ) external;

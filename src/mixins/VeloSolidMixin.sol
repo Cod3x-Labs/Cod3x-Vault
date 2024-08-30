@@ -3,25 +3,25 @@
 pragma solidity ^0.8.0;
 
 import "oz/token/ERC20/utils/SafeERC20.sol";
-import "../interfaces/IThenaRamRouter.sol";
-import "../interfaces/IThenaRamPair.sol";
+import "../interfaces/IVeloRouter.sol";
+import "../interfaces/IVeloPair.sol";
 import "../interfaces/ISwapErrors.sol";
-import "../interfaces/IThenaRamFactory.sol";
+import "../interfaces/IVeloV1AndV2Factory.sol";
 import "../libraries/Babylonian.sol";
 
-abstract contract ThenaRamMixin is ISwapErrors {
+abstract contract VeloSolidMixin is ISwapErrors {
     using SafeERC20 for IERC20;
 
-    event ThenaRamSwapPathUpdated(
-        address indexed from, address indexed to, address indexed router, IThenaRamRouter.route[] path
+    event VeloSwapPathUpdated(
+        address indexed from, address indexed to, address indexed router, IVeloRouter.Route[] path
     );
 
     /// @dev tokenA => (tokenB => (router => path): returns best path to swap
     ///         tokenA to tokenB for the given router (protocol)
-    mapping(address => mapping(address => mapping(address => IThenaRamRouter.route[]))) public thenaRamSwapPaths;
+    mapping(address => mapping(address => mapping(address => IVeloRouter.Route[]))) public veloSwapPaths;
 
     /// @dev Helper function to swap {_from} to {_to} given an {_amount}.
-    function _swapThenaRam(
+    function _swapVelo(
         address _from,
         address _to,
         uint256 _amount,
@@ -33,11 +33,11 @@ abstract contract ThenaRamMixin is ISwapErrors {
         if (_from == _to || _amount == 0) {
             return 0;
         }
-        IThenaRamRouter.route[] storage path = thenaRamSwapPaths[_from][_to][_router];
+        IVeloRouter.Route[] storage path = veloSwapPaths[_from][_to][_router];
         require(path.length != 0, "Missing path for swap");
 
         uint256 predictedOutput;
-        IThenaRamRouter router = IThenaRamRouter(_router);
+        IVeloRouter router = IVeloRouter(_router);
         try router.getAmountsOut(_amount, path) returns (uint256[] memory amounts) {
             predictedOutput = amounts[amounts.length - 1];
         } catch {}
@@ -50,29 +50,23 @@ abstract contract ThenaRamMixin is ISwapErrors {
         IERC20(_from).safeIncreaseAllowance(_router, _amount);
         // Based on configurable param catch fails or just revert
         if (_tryCatchActive != false) {
-            try router.swapExactTokensForTokens(
-                _amount, _minAmountOut, path, address(this), _deadline
-            ) {
+            try router.swapExactTokensForTokens(_amount, _minAmountOut, path, address(this), _deadline) {
                 amountOut = IERC20(_to).balanceOf(address(this)) - toBalBefore;
             } catch {
                 IERC20(_from).safeApprove(_router, 0);
                 emit SwapFailed(_router, _amount, _minAmountOut, _from, _to);
             }
         } else {
-            router.swapExactTokensForTokens(
-                _amount, _minAmountOut, path, address(this), _deadline
-            );
+            router.swapExactTokensForTokens(_amount, _minAmountOut, path, address(this), _deadline);
             amountOut = IERC20(_to).balanceOf(address(this)) - toBalBefore;
         }
     }
 
-    function _getSwapAmountThenaRam(
-        IThenaRamPair pair,
-        uint256 investmentA,
-        uint256 reserveA,
-        uint256 reserveB,
-        address tokenA
-    ) internal view returns (uint256 swapAmount) {
+    function _getSwapAmountVelo(IVeloPair pair, uint256 investmentA, uint256 reserveA, uint256 reserveB, address tokenA)
+        internal
+        view
+        returns (uint256 swapAmount)
+    {
         uint256 halfInvestment = investmentA / 2;
         uint256 numerator = pair.getAmountOut(halfInvestment, tokenA);
         uint256 denominator = _quoteLiquidity(halfInvestment, reserveA + halfInvestment, reserveB - numerator);
@@ -92,35 +86,29 @@ abstract contract ThenaRamMixin is ISwapErrors {
     }
 
     /// @dev Update {SwapPath} for a specified pair of tokens.
-    function _updateThenaRamSwapPath(
-        address _tokenIn,
-        address _tokenOut,
-        address _router,
-        IThenaRamRouter.route[] memory _path
-    ) internal {
+    function _updateVeloSwapPath(address _tokenIn, address _tokenOut, address _router, IVeloRouter.Route[] memory _path)
+        internal
+    {
         require(
             _tokenIn != _tokenOut && _path.length != 0 && _path[0].from == _tokenIn
                 && _path[_path.length - 1].to == _tokenOut
         );
-        delete thenaRamSwapPaths[_tokenIn][_tokenOut][_router];
+        delete veloSwapPaths[_tokenIn][_tokenOut][_router];
         for (uint256 i = 0; i < _path.length; i++) {
             if (i < _path.length - 1) {
                 require(_path[i].to == _path[i + 1].from);
-                IThenaRamFactory factory = IThenaRamFactory(IThenaRamRouter(_router).factory());
+                IVeloV1AndV2Factory factory = IVeloV1AndV2Factory(IVeloRouter(_router).factory());
                 address pair = factory.getPair(_path[i].from, _path[i].to, _path[i].stable);
                 bool isPair = factory.isPair(pair);
                 require(isPair);
             }
-            thenaRamSwapPaths[_tokenIn][_tokenOut][_router].push(_path[i]);
+            veloSwapPaths[_tokenIn][_tokenOut][_router].push(_path[i]);
         }
-        emit ThenaRamSwapPathUpdated(_tokenIn, _tokenOut, _router, _path);
+        emit VeloSwapPathUpdated(_tokenIn, _tokenOut, _router, _path);
     }
 
     // Be sure to permission this in implementation
-    function updateThenaRamSwapPath(
-        address _tokenIn,
-        address _tokenOut,
-        address _router,
-        IThenaRamRouter.route[] memory _path
-    ) external virtual;
+    function updateVeloSwapPath(address _tokenIn, address _tokenOut, address _router, IVeloRouter.Route[] memory _path)
+        external
+        virtual;
 }
