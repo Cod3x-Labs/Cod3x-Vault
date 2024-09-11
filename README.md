@@ -39,4 +39,3 @@ forge build
 forge test
 ```
 
-![Architecture diagram](docs/architecture.png)
