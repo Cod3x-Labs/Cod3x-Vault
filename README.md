@@ -1,6 +1,6 @@
 # Description
 
-Submodules for Cod3x vaults and strategies, to be consumed by deployers of specific vaults and strategies.
+Submodules for Cod3x vaults and strategies, to be consumed by deployer repositories of specific vaults and strategies.
 
 ## ReaperVaultV2
 Multi-strategy vault base class
