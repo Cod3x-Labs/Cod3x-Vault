@@ -6,27 +6,23 @@ Multi-strategy vault base classes, meant to be ingested as a submodule in other 
 ## ReaperSwapper
 A configurable swapper smart contract for reaper strategies that interfaces with several decentralized exchanges. Deployed once per chain alongside strategies.
 
-# Installation
-
-## Local development
+# Development
 
 This project uses [Foundry](https://github.com/gakonst/foundry) as the development framework.
 
-### Dependencies
+## Dependencies
 
 ```
 forge install
 ```
 
-### Compilation
+## Compilation
 
 ```
 forge build
 ```
 
-# Testing
-
-## Dynamic
+## Testing
 
 ```
 forge test
