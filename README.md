@@ -39,6 +39,4 @@ forge build
 forge test
 ```
 
-`--report lcov` - coverage which can be turned on in code using "Coverage Gutters"
-
 ![Architecture diagram](docs/architecture.png)
